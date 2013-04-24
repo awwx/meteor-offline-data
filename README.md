@@ -2,7 +2,7 @@
 
 Home of the Meteor offline data project.
 
-The offline-data package implements an "Offline Collection" which can be used in place of a regular Meteor.Collection.
+The offline-data package will implement an "Offline Collection" which can be used in place of a regular Meteor.Collection.
 It adds the following capabilities:
 
 * A copy of the data from the server, and local changes made by the user not yet sent to the server,
