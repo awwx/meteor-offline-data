@@ -30,3 +30,9 @@ this implementation will be special purpose to accounts (since method calls can'
 callback, since methods can be start in one instance of the application while offline and complete afte
 the application has been closed and opened again... and a function callback would no longer exist in
 JavaScript memory.
+
+
+## Current Progress ##
+
+A [simulator](https://github.com/awwx/meteor-offline-sim#readme) is available for the offline data
+algorithm.
