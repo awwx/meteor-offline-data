@@ -27,7 +27,7 @@ first authenticate and then send updates, so that the updates run with the user'
 this implementation will be special purpose to accounts (since method calls can't wait while offline).
 
 * For offline collections, the API for reporting method completion will change from using a function
-callback, since methods can be start in one instance of the application while offline and complete afte
+callback, since methods can be start in one instance of the application while offline and complete after
 the application has been closed and opened again... and a function callback would no longer exist in
 JavaScript memory.
 
