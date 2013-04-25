@@ -31,6 +31,10 @@ callback, since methods can be start in one instance of the application while of
 the application has been closed and opened again... and a function callback would no longer exist in
 JavaScript memory.
 
+* Unnamed subscriptions (such as published by the `autopublish` package) are not supported.  You
+will need to use [Meteor.publish](http://docs.meteor.com/#meteor_publish) with a non-null `name`
+argument to publish subscriptions for use by offline collections.
+
 
 ## Current Progress ##
 
