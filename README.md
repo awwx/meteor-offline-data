@@ -14,6 +14,13 @@ tab is unloaded from memory on mobile devices.
 * Changes made by the user are reactively shared across browser tabs open on the same application,
 even when offline.
 
+
+## Fundraiser ##
+
+I've started a fundraiser to fund the rapid development of the offline data package:
+https://www.wepay.com/donations/meteor-offline-data
+
+
 ## Limitations and API Changes ##
 
 * The implementation only supports idempotent updates (updates that can be applied more than once without 
