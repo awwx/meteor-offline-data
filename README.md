@@ -18,7 +18,7 @@ even when offline.
 ## Fundraiser ##
 
 I've started a fundraiser to fund the rapid development of the offline data package:
-https://www.wepay.com/donations/meteor-offline-data
+http://igg.me/at/meteor-offline-data/x/3134107
 
 
 ## Limitations and API Changes ##
