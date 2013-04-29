@@ -45,5 +45,5 @@ argument to publish subscriptions for use by offline collections.
 
 ## Current Progress ##
 
-A [simulator](https://github.com/awwx/meteor-offline-sim#readme) is available for the offline data
-algorithm.
+A [simulator](https://github.com/awwx/meteor-offline-sim#readme) is available for a part of
+the offline data algorithm.
