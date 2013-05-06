@@ -1,8 +1,7 @@
 # Meteor Offline Data #
 
-Home of the Meteor offline data project.
-
-The project will implement an "Offline Collection" which wraps a `Meteor.Collection`:
+Home of the Meteor offline data project, implementing an "Offline Collection" which wrap
+a `Meteor.Collection`:
 
 * Data from the server is stored persistently in the browser database, making it available to the
 application even if the application starts up offline.
