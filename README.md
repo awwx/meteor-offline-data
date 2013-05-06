@@ -2,23 +2,23 @@
 
 Home of the Meteor offline data project.
 
-The offline-data package will implement an "Offline Collection" which can be used in place of
-a regular `Meteor.Collection`.
-It adds the following capabilities:
+The project will implement an "Offline Collection" which wraps a `Meteor.Collection`:
 
-* A copy of the data from the server, and local changes made by the user not yet sent to the server,
-are stored persistently in the browser.  This makes the data available for use while offline, and
-avoids having losing user updates if the application is closed while offline or if the application
-tab is unloaded from memory on mobile devices.
+* Data from the server is stored persistently in the browser database, making it available to the
+application even if the application starts up offline.
 
-* Changes made by the user are reactively shared across browser tabs open on the same application,
-even when offline.
+* Changes made by the user are also saved in the browser database, preserving them if the browser
+is closed and reopened. The next time the application goes online the changes are sent up to the
+server.
+
+* Updates are reactively shared across browser tabs open on the same application, even while
+offline.
 
 
 ## Fundraiser ##
 
-I've started a fundraiser to fund the rapid development of the offline data package:
-http://igg.me/at/meteor-offline-data/x/3134107
+This work is being made possible by contributors to the
+[Meteor Offline Data Campaign](http://offline-data.meteor.com/).
 
 
 ## Limitations and API Changes ##
