@@ -166,7 +166,7 @@ Note that method completion is broadcast to all listening tabs.
 
 *TODO: This is a straightforward conversion of the Meteor method
 completion API to support resumed applications, but it would be good
-to walk through some use cases to see if this is exactly what we
+to walk through some use cases to see if this is what we really
 want.*
 
 
