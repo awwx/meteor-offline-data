@@ -39,14 +39,12 @@ reactively shared across browser tabs open on the same application,
 and method calls can complete in a different instance of the
 application.
 
-There are other aspects of offline functionality not addressed
-by this API.  For example, conflict resolution can become more
-important when some updates are delayed in time by applications being
-offline.  Unlike simply persisting data in the client with offline
-collections (which doesn't need participation by the server), a
+There are other aspects of offline functionality not addressed by this
+API.  For example, conflict resolution can become more important when
+some updates are delayed in time by applications being offline.  A
 conflict resolution strategy might involve for example adding a last
-modified timestamp to server documents and then accepting, rejecting,
-or merging updates in a server method.
+modified timestamp to server documents, and then accepting, rejecting,
+or perhaps merging updates in a server method.
 
 
 ## Offline API
