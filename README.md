@@ -138,9 +138,9 @@ Calls an offline method.
 There is no `asyncCallback` argument because it is quite normal for an
 offline method to be started in one instance of the application while
 offline, have the tab be closed or unloaded, and then for the method
-call to complete in another instance of the application.  (This is how
-changes the user makes to collections are saved until the application
-goes online again).
+call to complete in another instance of the application when the
+browser is online again.  (This is how changes the user makes to
+collections are saved until the application goes online again).
 
 Instead you can listen for method complete events.
 
@@ -169,7 +169,7 @@ want.*
 
 
 <br>
-**new Offline.Collection(*name*)**  *client*
+**new Offline.Collection(<i>name</i>)**  *client*
 
 Creates and returns an offline collection.  `name` is the name of a
 regular `Meteor.Collection` on the server.
