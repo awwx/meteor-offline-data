@@ -146,11 +146,11 @@ goes online again).
 
 Instead you can listen for method complete events.
 
-*TODO: `Offline.apply`, and doing something or another with `wait`.*
+*TODO: `Offline.apply`, and doing something for `wait`.*
 
 
 <br>
-**Offline.methodComplete([ name, ] callback)**  *client*
+**Offline.methodCompleted([ name, ] callback)**  *client*
 
 Registers a callback to be called when an offline method `name` has
 completed: the method has returned a result and the server's writes
@@ -165,8 +165,9 @@ error or result returned:
 Note that method completion is broadcast to all listening tabs.
 
 *TODO: This is a straightforward conversion of the Meteor method
- completion API to support resumed applications, but it would be good
- to walk through some use cases.*
+completion API to support resumed applications, but it would be good
+to walk through some use cases to see if this is exactly what we
+want.*
 
 
 <br>
@@ -179,7 +180,7 @@ regular `Meteor.Collection` on the server.
 an offline collection or not).
 
 Internally, an `Offline.Collection` wraps a `Meteor.Collection` of the
-same name, but changing the collection modification method calls to be
+same name, changing the collection modification method calls to be
 offline calls.
 
 (Note that because `Offline.Collection` opens the `Meteor.Collection`
