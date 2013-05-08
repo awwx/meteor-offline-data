@@ -52,18 +52,19 @@ or merging updates in a server method.
 ## Offline API
 
 **Offline.subscribe(name [, arg1, arg2, ... ] [, callbacks])**
+*client*
 
 In standard Meteor, each browser tab has its own set of collections,
 independent of the other tabs.  A change to a collection in one tab
 will be reactively shared with other tabs by making a round trip
-through the server.  When offline, one tab will not see a change made
-by another tab.
+through the server; but when offline, one tab will not see a change
+made by another tab.
 
-Offline collections are shared across browser tabs, so that a change
-in one tab is seen in another tab -- even when offline.  This means
-that subscriptions are also shared: making a subscription in one tab
-will cause documents delivered for that subscription to be seen by all
-tabs.
+In constrast offline collections are shared across browser tabs, so
+that a change in one tab is seen in another tab -- even when offline.
+This means that subscriptions are also shared: making a subscription
+in one tab will cause documents delivered for that subscription to be
+seen by all tabs.
 
 An application that was relying on filtering subscriptions on the
 server ("send me the items for the selected project") may need to
@@ -74,8 +75,8 @@ for both projects).  However an application designed to be used
 offline may want to filter less on the server anyway, so that more
 data is persisted locally for offline use.
 
-Internally, only one tab actually makes the subscriptions to the
-server at a time.  Since all the tabs are getting the same data,
+Internally, only one tab actually subscribes to the subscriptions on
+the server at a time.  Since all tabs are getting the same data,
 there's no need to use additional bandwidth to retrieve the same
 documents multiple times.  The browser tabs cooperatively select one
 of themselves as the "proxy tab", the tab that the other tabs use to
@@ -84,7 +85,7 @@ tab that is currently the proxy tab is closed or becomes inactive.
 
 
 <br>
-**Offline.Methods(methods)**  *client*
+**Offline.methods(methods)**  *client*
 
 Define client stubs for methods that can be called offline.
 
@@ -102,11 +103,12 @@ Offline methods are saved persistently in the browser's database, and
 will be delivered when the browser goes online -- even if the
 application was closed or unloaded in the meantime.
 
-In Meteor, the collection modification methods (*collection*.insert,
-*collection*.update, *collection*.remove) are translated into method
-calls internally, and so this is the mechanism by which changes to
-offline collections are persisted if needed until the application has
-a connection.
+In Meteor, the collection modification methods
+(<em>collection</em>.insert, <em>collection</em>.update,
+<em>collection</em>.remove) are translated into method calls
+internally, and so this is the mechanism by which changes to offline
+collections are persisted (if needed) until the application has a
+connection.
 
 A limitation of offline methods is that they need to be *idempotent*:
 running a method more than once needs to produce the same result as
