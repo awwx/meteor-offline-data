@@ -1,0 +1,11 @@
+{
+  "name": "offline-data",
+
+  "packages": {
+    "browser-msg": "0.0.2",
+    "canonical-stringify": {
+      "git": "https://github.com/awwx/meteor-canonical-stringify.git",
+      "tag": "v1.0"
+    }
+  }
+}

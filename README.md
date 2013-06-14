@@ -11,8 +11,32 @@ up offline.
 preserving them if the browser is closed and reopened. The next time
 the application goes online the changes are sent up to the server.
 
-* Updates are reactively shared across browser tabs open on the same
+* Updates are reactively shared across browser windows open on the same
 application, even while offline.
+
+
+## Version
+
+0.0.0 early alpha release
+
+Major gaps:
+
+* [slow startup](https://github.com/awwx/meteor-offline-data/issues/4)
+
+* [no support yet for IE and Firefox](https://github.com/awwx/meteor-offline-data/issues/5)
+
+* [no fallback if the browser database isn't available](https://github.com/awwx/meteor-offline-data/issues/6)
+
+* [no support for accounts](https://github.com/awwx/meteor-offline-data/issues/2)
+
+See the [issues list](https://github.com/awwx/meteor-offline-data/issues)
+for the full known TODO list.
+
+
+## Fundraising Campaign ##
+
+This work is being made possible by contributors to the
+[Meteor Offline Data Campaign](http://offline-data.meteor.com/).
 
 
 ## Offline Data Package
@@ -35,16 +59,18 @@ memory.
 
 When using offline collections the major architectural differences to
 the application are that offline collections and subscriptions are
-reactively shared across browser tabs open on the same application,
+reactively shared across browser windows open on the same application,
 and method calls can complete in a different instance of the
 application.
 
-There are other aspects of offline functionality not addressed by this
-API.  For example, conflict resolution can become more important when
-some updates are delayed in time by applications being offline.  A
-conflict resolution strategy might involve for example adding a last
-modified timestamp to server documents, and then accepting, rejecting,
-or perhaps merging updates in a server method.
+
+## Limitations ##
+
+* Unnamed subscriptions (such as published by the `autopublish`
+package) are not supported.  You will need to use
+[Meteor.publish](http://docs.meteor.com/#meteor_publish) with a
+non-null `name` argument to publish subscriptions for use by offline
+collections.
 
 
 ## Offline API
@@ -52,34 +78,35 @@ or perhaps merging updates in a server method.
 **Offline.subscribe(name [, arg1, arg2, ... ] [, callbacks])**
 *client*
 
-In standard Meteor, each browser tab has its own set of collections,
-independent of the other tabs.  A change to a collection in one tab
-will be reactively shared with other tabs by making a round trip
-through the server; but when offline, one tab will not see a change
-made by another tab.
+In standard Meteor, each browser window has its own set of
+collections, independent of the other windows.  A change to a
+collection in one window will be reactively shared with other windows
+by making a round trip through the server; but when offline, one
+window will not see a change made by another window.
 
-In constrast offline collections are shared across browser tabs, so
-that a change in one tab is seen in another tab -- even when offline.
-This means that subscriptions are also shared: making a subscription
-in one tab will cause documents delivered for that subscription to be
-seen by all tabs.
+In constrast offline collections are shared across browser windows, so
+that a change in one window is seen in another window -- even when
+offline.  This means that subscriptions are also shared: making a
+subscription in one window will cause documents delivered for that
+subscription to be seen by all windows.
 
 An application that was relying on filtering subscriptions on the
 server ("send me the items for the selected project") may need to
 re-apply the filter on the client when using an offline collections
-(two different tabs could each have a subscription to a different
-project, and then with an offline collection both tabs will see items
-for both projects).  However an application designed to be used
+(two different windows could each have a subscription to a different
+project, and then with an offline collection both windows will see
+items for both projects).  However an application designed to be used
 offline may want to filter less on the server anyway, so that more
 data is persisted locally for offline use.
 
-Internally, only one tab actually subscribes to the subscriptions on
-the server at a time.  Since all tabs are getting the same data,
+Internally, only one window actually subscribes to the subscriptions
+on the server at a time.  Since all windows are getting the same data,
 there's no need to use additional bandwidth to retrieve the same
-documents multiple times.  The browser tabs cooperatively select one
-of themselves as the "proxy tab", the tab that the other tabs use to
-fetch data from the server.  The proxy tab can change over time if the
-tab that is currently the proxy tab is closed or becomes inactive.
+documents multiple times.  The browser windows cooperatively select
+one of themselves to be the "agent", the window that the other windows
+use to fetch data from the server.  The agent can change over time if
+the window that is currently the agent window is closed or becomes
+inactive.
 
 
 <br>
@@ -93,9 +120,9 @@ In standard Meteor, if an application temporarily doesn't have a
 connection to the server, method calls will be queued up in memory.
 Meteor will automatically keep trying to reconnect and will send the
 method calls to the server when it is connected again.  However,
-undelivered method calls will be lost if the browser tab is closed, or
-if on a mobile device the tab is unloaded to save memory when
-switching between tabs or applications.
+undelivered method calls will be lost if the browser window is closed, or
+if on a mobile device the window is unloaded to save memory when
+switching between windows or applications.
 
 Offline methods are saved persistently in the browser's database, and
 will be delivered when the browser goes online -- even if the
@@ -108,27 +135,6 @@ internally, and so this is the mechanism by which changes to offline
 collections are persisted (if needed) until the application has a
 connection.
 
-A limitation of offline methods is that they need to be *idempotent*:
-running a method more than once needs to produce the same result as
-running it one time.  For example,
-
-Good:
-<pre>collection.update(docId, {<b>$set</b>: {foo: 5}});</pre>
-
-Bad:
-<pre>collection.update(docId, {<b>$inc</b>: {foo: 1}});</pre>
-
-The first is idempotent because you can set `foo` to `5` multiple
-times and get the same result (`foo` will still end up being `5`).
-The second is not idempotent because incrementing `foo` more than once
-produces a different value than incrementing it only once.
-
-You may be able to change method calls to make them idempotent.  For
-example, a method call to increment the vote on something might be
-changed to "user X likes Y", with the vote count calculated from the
-number of users who like Y.  The later is idempotent because saying
-that "X likes Y" more than once doesn't change the result.
-
 
 <br>
 **Offline.call(name, param1, param2, ...)**  *client*
@@ -137,7 +143,7 @@ Calls an offline method.
 
 There is no `asyncCallback` argument because it is quite normal for an
 offline method to be started in one instance of the application while
-offline, have the tab be closed or unloaded, and then for the method
+offline, have the window be closed or unloaded, and then for the method
 call to complete in another instance of the application when the
 browser is online again.  (This is how changes the user makes to
 collections are saved until the application goes online again).
@@ -150,6 +156,8 @@ Instead you can listen for method complete events.
 <br>
 **Offline.methodCompleted([ name, ] callback)**  *client*
 
+To be implemented.
+
 Registers a callback to be called when an offline method `name` has
 completed: the method has returned a result and the server's writes
 have replaced the stub's writes in the local cache.  If `name` is not
@@ -160,7 +168,7 @@ error or result returned:
 
     callback(name, params, error, result)
 
-Note that method completion is broadcast to all listening tabs.
+Note that method completion is broadcast to all listening windows.
 
 *TODO: This is a straightforward conversion of the Meteor method
 completion API to support resumed applications, but it would be good
@@ -177,13 +185,6 @@ regular `Meteor.Collection` on the server.
 (The server doesn't know or care if a client is using a collection as
 an offline collection or not).
 
-Internally, an `Offline.Collection` wraps a `Meteor.Collection` of the
-same name, changing the collection modification method calls to be
-offline calls.
-
-(Note that because `Offline.Collection` opens the `Meteor.Collection`
-itself, a client can't create an `Offline.Collection` and a
-`Meteor.Collection` for the same collection).
 
 <br>
 **offlineCollection.find**
@@ -207,36 +208,32 @@ what the API could look like.*
 There is no `allow` or `deny` methods on an offline collection as
 these are server-only methods.
 
+<br>
+**Offline.resetDatabase()**
 
-## TODO ##
-
-In standard Meteor logging in and logging out is supported in a
-general purpose way by having the "wait" option to method calls (one
-method call will log the user in, and other method calls will wait
-until the first one is done so that they run with the permissions of
-the newly logged in user).
-
-I'm unclear yet whether anything special or different needs to be done
-to support the interaction of offline methods / wait methods /
-accounts.
+Clears the browser database.
 
 
-## Limitations ##
+## Other Offline Functionality
 
-* Unnamed subscriptions (such as published by the `autopublish`
-package) are not supported.  You will need to use
-[Meteor.publish](http://docs.meteor.com/#meteor_publish) with a
-non-null `name` argument to publish subscriptions for use by offline
-collections.
+There's other functionality that might be useful or important for an
+offline application, but isn't part of the offline-data package.
 
 
-## Current Progress ##
+### Conflict resolution
 
-A [simulator](https://github.com/awwx/meteor-offline-sim#readme) is
-available for the offline data algorithm implemented so far.
+Conflict resolution can become more important when some updates are
+delayed in time by applications being offline.  A conflict resolution
+strategy might involve for example adding a last modified timestamp to
+server documents, and then accepting, rejecting, or perhaps merging
+updates in a server method.
 
 
-## Fundraising Campaign ##
+### Incremental loading of large data sets
 
-This work is being made possible by contributors to the
-[Meteor Offline Data Campaign](http://offline-data.meteor.com/).
+The offline-data package makes a standard Meteor subscription to
+receive data, which means that just like with a regular Meteor
+application all the documents in the subscription are sent down to the
+client each time the application is opened.  For larger data sets
+(with some kind of support on the server to keep track of versioning)
+it would be nice to only need to download new and changed documents.
