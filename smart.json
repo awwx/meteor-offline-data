@@ -9,6 +9,8 @@
 
   "version": "0.0.1",
 
+  "git": "https://github.com/awwx/meteor-offline-data.git",
+
   "packages": {
     "browser-msg": "0.0.2",
     "canonical-stringify": {
