@@ -1,6 +1,14 @@
 {
   "name": "offline-data",
 
+  "description": "offline data",
+
+  "homepage": "https://github.com/awwx/meteor-offline-data#readme",
+
+  "author": "Andrew Wilcox",
+
+  "version": "0.0.1",
+
   "packages": {
     "browser-msg": "0.0.2",
     "canonical-stringify": {
