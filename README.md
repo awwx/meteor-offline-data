@@ -17,7 +17,7 @@ application, even while offline.
 
 ## Version
 
-0.0.0 early alpha release
+0.0.1 early alpha release.
 
 Major gaps:
 
