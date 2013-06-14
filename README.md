@@ -73,6 +73,12 @@ non-null `name` argument to publish subscriptions for use by offline
 collections.
 
 
+## Example
+
+The Meteor "todos" example,
+[modified to use offline-data](https://github.com/awwx/meteor-offline-todos#readme).
+
+
 ## Offline API
 
 **Offline.subscribe(name [, arg1, arg2, ... ] [, callbacks])**
