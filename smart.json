@@ -1,7 +1,7 @@
 {
   "name": "offline-data",
 
-  "description": "offline data",
+  "description": "Use collections and save method calls offline",
 
   "homepage": "https://github.com/awwx/meteor-offline-data#readme",
 
