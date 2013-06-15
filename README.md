@@ -17,11 +17,13 @@ application, even while offline.
 
 ## Version
 
-0.0.1 early alpha release.
+0.0.2 early alpha release.
 
 Major gaps:
 
 * [slow startup](https://github.com/awwx/meteor-offline-data/issues/4)
+
+* [iOS only works in one tab](https://github.com/awwx/meteor-offline-data/issues/17)
 
 * [no support yet for IE and Firefox](https://github.com/awwx/meteor-offline-data/issues/5)
 
