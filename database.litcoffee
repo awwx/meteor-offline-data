@@ -21,13 +21,6 @@
     now = -> new Date().getTime()
 
 
-    isTransaction = Match.Where (x) ->
-      unless (x.constructor?.name is 'SQLTransaction' and
-              x.executeSql?)
-        throw new Match.Error('not a transaction')
-      return true
-
-
     andthen = (result, fns...) ->
       while fns.length > 0
         fn = fns.shift()
@@ -367,10 +360,6 @@ modifications made by stubs.
 Write a document in the database.
 
       writeDoc: (tx, connection, collectionName, doc) ->
-        check(tx, isTransaction)
-        check(connection, String)
-        check(collectionName, String)
-        check(doc, Match.ObjectIncluding({_id: String}))
         begin "writeDoc",
           (=> @sql(tx,
             """
@@ -870,8 +859,6 @@ Read all queued methods across all connections.
 
 
       addUpdate: (tx, update) ->
-        check(tx, isTransaction)
-        check(update, Object)
         begin "addUpdate",
           (=>
             serialized = EJSON.stringify(update)
