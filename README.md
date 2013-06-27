@@ -15,6 +15,10 @@ the application goes online the changes are sent up to the server.
 application, even while offline.
 
 
+See the
+[two minute video introducing Offline Data](http://vimeo.com/64803472)
+
+
 ## Version
 
 0.0.3 early alpha release.
@@ -28,6 +32,8 @@ Major gaps:
 * [no fallback if the browser database isn't available](https://github.com/awwx/meteor-offline-data/issues/6)
 
 * [no support for accounts](https://github.com/awwx/meteor-offline-data/issues/2)
+
+* [iOS needs unsubscription support](https://github.com/awwx/meteor-offline-data/issues/19)
 
 See the [issues list](https://github.com/awwx/meteor-offline-data/issues)
 for the full known TODO list.
