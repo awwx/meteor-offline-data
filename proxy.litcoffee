@@ -5,6 +5,20 @@
     database = Offline._database
     {thisWindowId} = Offline._windows
     {withContext} = awwx.Context
+    messageAgent = Offline._messageAgent
+
+
+    if Offline._usingSharedWebWorker
+
+      broadcastUpdate = ->
+        messageAgent 'update'
+        return
+
+    else
+
+      broadcastUpdate = ->
+        broadcast 'update'
+        return
 
 
 An offline subscription is ready when:
@@ -45,7 +59,7 @@ An offline subscription is ready when:
         )
       )
       .then(->
-        broadcast 'subscriptionsUpdated'
+        messageAgent 'subscriptionsUpdated'
       )
 
 
@@ -159,7 +173,7 @@ TODO support `onError` (will need to store error in database)
                 database.cleanSubscriptions(tx)
               )
             ).then(->
-              defer -> broadcast 'subscriptionsUpdated'
+              messageAgent 'subscriptionsUpdated'
             )
             return
         }
@@ -239,7 +253,7 @@ https://github.com/meteor/meteor/blob/release/0.6.1/packages/livedata/livedata_c
           )
         )
         .then(=>
-          broadcast 'update'
+          broadcastUpdate()
           if exception
             return Result.failed(exception)
           else
@@ -289,7 +303,7 @@ https://github.com/meteor/meteor/blob/release/0.6.1/packages/livedata/livedata_c
             )
           )
           .then(=>
-            broadcast 'newQueuedMethod'
+            messageAgent 'newQueuedMethod'
             return
           )
         )
@@ -457,9 +471,6 @@ TODO getting called a lot
       return
 
 
-    broadcast.listen 'update', processUpdates
-
-
     Meteor.startup ->
       database.transaction((tx) ->
         database.readSubscriptions(tx)
@@ -473,3 +484,16 @@ TODO getting called a lot
 
 
     Offline.Collection = OfflineCollection
+
+
+    if Offline._usingSharedWebWorker
+
+      Offline._sharedWebWorker.addMessageHandler 'update', (data) ->
+        processUpdates()
+        return
+
+    else
+
+      broadcast.listen 'update', ->
+        processUpdates()
+        return

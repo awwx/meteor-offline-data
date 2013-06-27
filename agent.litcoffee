@@ -1,3 +1,15 @@
+If we're running in a browser window and we're using a shared web
+worker for the agent, then we're not the agent.
+
+    if Offline?._usingSharedWebWorker
+
+      Offline._messageAgent = (topic, args...) ->
+        Offline._sharedWebWorker.post {msg: topic, args}
+        return
+
+      return
+
+
     {contains, Result} = awwx
     {withContext} = awwx.Context
     broadcast = Offline._broadcast
@@ -7,6 +19,50 @@
     database = Offline._database
 
     Offline._test or= {}
+
+
+    if @Agent?
+
+      Agent.addMessageHandler 'update', (sourcePort, data) ->
+        for port in Agent.ports
+          unless port is sourcePort
+            port.postMessage({msg: 'update'})
+        return
+
+
+      addMessageHandler = (topic, callback) ->
+        Agent.addMessageHandler topic, (sourcePort, data) ->
+          callback()
+          return
+
+
+      broadcastUpdate = ->
+        for port in Agent.ports
+          port.postMessage({msg: 'update'})
+        return
+
+
+    else
+
+      handlers = {}
+
+      addMessageHandler = (topic, callback) ->
+        handlers[topic] = callback
+        broadcast.listen topic, callback
+        return
+
+
+      broadcastUpdate = ->
+        broadcast.includingSelf 'update'
+        return
+
+
+      Offline._messageAgent = (topic, args...) ->
+        if Offline._windows.currentlyTheAgent()
+          handlers[topic]?(args...)
+        else
+          broadcast topic, args...
+        return
 
 
     updateSubscriptionsReadyInTx = (tx) ->
@@ -39,6 +95,10 @@
     Offline._test.updateSubscriptionsReadyInTx = updateSubscriptionsReadyInTx
 
 
+TODO what we really want here for broadcasting updates is to have an
+"after transaction" callback that would broadcast an update iff an
+update was added to the database during the transaction.
+
     updateSubscriptionsReady = ->
       withContext "updateSubscriptionsReady", ->
         database.transaction((tx) ->
@@ -46,7 +106,7 @@
         )
         .then((someNewlyReady) ->
           if someNewlyReady
-            broadcast 'update'
+            broadcastUpdate()
           return
         )
 
@@ -72,16 +132,28 @@
       {name: subscription.name, args: subscription.args}
 
 
-    asAgentWindow = (fn) ->
-      database.transaction((tx) =>
-        database.readAgentWindow(tx)
-        .then((agentWindowId) =>
-          if agentWindowId is thisWindowId
-            return fn(tx)
-          else
-            return Result.failed()
+If we're running in the shared web worker, we're always the agent.
+
+    if @Agent?
+
+      asAgentWindow = (fn) ->
+        database.transaction(fn)
+
+Otherwise, running in a browser window, we need to check if we're
+still the agent in the transaction.
+
+    else
+
+      asAgentWindow = (fn) ->
+        database.transaction((tx) =>
+          database.readAgentWindow(tx)
+          .then((agentWindowId) =>
+            if agentWindowId is thisWindowId
+              return fn(tx)
+            else
+              return Result.failed()
+          )
         )
-      )
 
 
 Mapping of connection name to ConnectionAgents.
@@ -181,7 +253,7 @@ serialized subscription -> Meteor subscription handle
             @checkIfReadyToDeleteDocs(tx)
           )
           .then(->
-            defer -> broadcast 'update'
+            broadcastUpdate()
           )
 
       currentSubscriptions: ->
@@ -262,7 +334,7 @@ serialized subscription -> Meteor subscription handle
           )
         )
         .then(->
-          broadcast 'update'
+          broadcastUpdate()
         )
         return
 
@@ -407,7 +479,7 @@ collection which are no longer present on the server.
           @updateDocIfFree(tx, docId, doc)
         )
         .then(=>
-          broadcast 'update'
+          broadcastUpdate()
         )
         return
 
@@ -444,7 +516,7 @@ TODO can we batch updates into one transaction?
       return
 
 
-    broadcast.listen 'subscriptionsUpdated', ->
+    addMessageHandler 'subscriptionsUpdated', ->
       updateSubscriptions()
       return
 
@@ -455,10 +527,12 @@ TODO can we batch updates into one transaction?
       return
 
 
-    broadcast.listen 'newQueuedMethod', ->
+    addMessageHandler 'newQueuedMethod', ->
       sendQueuedMethods()
       return
 
-    broadcast.listen 'deadWindows', ->
-      subscriptionsUpdated()
-      return
+
+    unless @Agent?
+      broadcast.listen 'deadWindows', ->
+        subscriptionsUpdated()
+        return

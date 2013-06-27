@@ -17,13 +17,11 @@ application, even while offline.
 
 ## Version
 
-0.0.2 early alpha release.
+0.0.3 early alpha release.
 
 Major gaps:
 
 * [slow startup](https://github.com/awwx/meteor-offline-data/issues/4)
-
-* [iOS only works in one tab](https://github.com/awwx/meteor-offline-data/issues/17)
 
 * [no support yet for IE and Firefox](https://github.com/awwx/meteor-offline-data/issues/5)
 
@@ -33,12 +31,6 @@ Major gaps:
 
 See the [issues list](https://github.com/awwx/meteor-offline-data/issues)
 for the full known TODO list.
-
-
-## Fundraising Campaign ##
-
-This work is being made possible by contributors to the
-[Meteor Offline Data Campaign](http://offline-data.meteor.com/).
 
 
 ## Offline Data Package
@@ -106,15 +98,6 @@ project, and then with an offline collection both windows will see
 items for both projects).  However an application designed to be used
 offline may want to filter less on the server anyway, so that more
 data is persisted locally for offline use.
-
-Internally, only one window actually subscribes to the subscriptions
-on the server at a time.  Since all windows are getting the same data,
-there's no need to use additional bandwidth to retrieve the same
-documents multiple times.  The browser windows cooperatively select
-one of themselves to be the "agent", the window that the other windows
-use to fetch data from the server.  The agent can change over time if
-the window that is currently the agent window is closed or becomes
-inactive.
 
 
 <br>
@@ -222,7 +205,7 @@ these are server-only methods.
 Clears the browser database.
 
 
-## Other Offline Functionality
+## Offline Functionality Not Included
 
 There's other functionality that might be useful or important for an
 offline application, but isn't part of the offline-data package.
@@ -245,3 +228,44 @@ application all the documents in the subscription are sent down to the
 client each time the application is opened.  For larger data sets
 (with some kind of support on the server to keep track of versioning)
 it would be nice to only need to download new and changed documents.
+
+
+## Architecture ##
+
+Offline subscriptions are made from the "offline agent" in the client,
+which connects to the server on behalf of the browser windows.  This
+allows updates from the server to be delivered to the browser over one
+connection, instead of redundantly delivered to every browser window;
+and as offline collections are shared across browser windows, ensures
+that the browser sees a consistent view of updates from the server.
+
+In browsers which support
+[shared web workers](http://caniuse.com/#feat=sharedworkers),
+the agent runs inside of a shared web worker.  Otherwise, the browser
+windows cooperatively elect one of their number to act as the agent
+for the other windows.
+
+(In iOS, timeout and interval events are not delivered to tabs other
+than the active tab, which would make it hard for a tab to act as the
+agent for the other tabs when it wasn't the active tab; but iOS Safari
+does support shared web workers.  The Android browser doesn't support
+shared web workers, but timer events are delivered to all tabs and so
+there's no problem on Android having one tab act as the agent for the
+other tabs.)
+
+While in theory it might be possible for individual browser windows
+not to make any connection to the server at all and to channel all
+communication through the agent, the offline-data package is designed
+to run on top of standard Meteor and so browser windows do each have
+their own livedata connection to the server.
+
+Communication for regular (non-offline) Meteor collections, Meteor
+methods, and the hot code reload notification go through the
+individual window's livedata connection as usual, in the same way as
+when the offline-data packages isn't being used.
+
+
+## Fundraiser ##
+
+This work is being made possible by contributors to the
+[Meteor Offline Data Campaign](http://offline-data.meteor.com/).

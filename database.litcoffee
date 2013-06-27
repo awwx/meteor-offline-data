@@ -1,6 +1,13 @@
     DATABASE_NAME = 'awwx/offline-data'
     DATABASE_VERSION = '5'
 
+
+The global environment is `window` in a regular web page, but `self`
+in a shared web worker.
+
+    global = this
+
+
     {canonicalStringify, contains, Result} = awwx
     {getContext, getResponsible, withContext} = awwx.Context
     {bind, reportError} = awwx.Error
@@ -103,7 +110,7 @@ TODO do any browsers pay attention to the size argument?
 
       openDatabase: (options = {}) ->
         withContext 'open SQL database', =>
-          @sqldb = window.openDatabase(DATABASE_NAME, '', '', 1024 * 1024)
+          @sqldb = global.openDatabase(DATABASE_NAME, '', '', 1024 * 1024)
           return
 
 
@@ -974,7 +981,7 @@ Read all queued methods across all connections.
 
     store = null
 
-    if window.openDatabase
+    if global.openDatabase
       Offline.supported = true
       store = new SQLStore()
       Offline._SQLStore = SQLStore

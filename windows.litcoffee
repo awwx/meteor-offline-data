@@ -1,3 +1,4 @@
+    @Offline or= {}
     {Fanout, Result} = awwx
     broadcast = Offline._broadcast
     {defer} = awwx.Error
@@ -11,6 +12,38 @@
     nowAgent = new Fanout()
     noLongerAgent = new Fanout()
 
+
+    # nowAgent.listen -> Meteor._debug "now the agent"
+    # noLongerAgent.listen -> Meteor._debug "no longer the agent"
+
+
+    Offline._windows = {nowAgent, noLongerAgent, thisWindowId}
+
+
+If we're running in a browser window and we're using a shared web
+worker for the agent, then we're not the agent.
+
+    return if Offline?._usingSharedWebWorker
+
+
+If we're running inside the shared web worker, then we're always the
+agent.
+
+TODO, as the shared web worker, ping windows to see if they're still
+alive.
+
+    if @Agent?
+
+      Meteor.startup ->
+        nowAgent()
+        return
+
+      return
+
+
+Otherwise, as a browser window when we don't have a shared web worker,
+we become the agent if/when no other live window is the agent /
+becomes the agent first.
 
     unload = ->
       withContext "unload", ->
@@ -75,6 +108,7 @@ doesn't have a supported database...?
 
     currentlyTheAgent = false
 
+    Offline._windows.currentlyTheAgent = -> currentlyTheAgent
 
     becomeTheAgentWindow = (tx) ->
       withContext "becomeTheAgentWindow", ->
@@ -123,7 +157,9 @@ tab immediately.
             return
 
           windowIdsAtLastCheck = {}
-          windowIdsAtLastCheck[windowId] = true for windowId in windowIds
+          for windowId in windowIds
+            unless windowId is thisWindowId
+              windowIdsAtLastCheck[windowId] = true
           broadcast 'ping'
           Result.delay(4000).then(-> windowIds)
         )
@@ -148,6 +184,3 @@ tab immediately.
         .then(-> check())
         Meteor.setInterval check, 10000
         return
-
-
-    Offline._windows = {nowAgent, noLongerAgent, thisWindowId}
