@@ -21,11 +21,7 @@ See the
 
 ## Version
 
-0.0.3 early alpha release.
-
-**The 0.0.3 release is currently broken because I've managed to confuse 
-later versions of Meteorite somehow (it ends up symlinking to the worker
-code instead of the offline-data API code)... I'm working on it.**</span>
+0.0.4 early alpha release.
 
 Major gaps:
 

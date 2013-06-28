@@ -1,8 +1,0 @@
-{
-  "packages": {
-    "canonical-stringify": {
-      "git": "https://github.com/awwx/meteor-canonical-stringify.git",
-      "tag": "v1.0"
-    }
-  }
-}

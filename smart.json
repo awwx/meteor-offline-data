@@ -1,21 +1,20 @@
 {
   "name": "offline-data",
 
-  "description": "Use collections and save method calls offline",
+  "description": "Offline data support",
 
   "homepage": "https://github.com/awwx/meteor-offline-data#readme",
 
   "author": "Andrew Wilcox",
 
-  "version": "0.0.3",
+  "version": "0.0.4",
 
   "git": "https://github.com/awwx/meteor-offline-data.git",
 
   "packages": {
-    "browser-msg": "0.0.2",
-    "canonical-stringify": {
-      "git": "https://github.com/awwx/meteor-canonical-stringify.git",
-      "tag": "v1.0"
+    "offline-common": {
+      "git": "https://github.com/awwx/meteor-offline-common.git",
+      "tag": "v0.0.4"
     }
   }
 }

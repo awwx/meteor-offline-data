@@ -90,7 +90,7 @@
       // the syntax error).
 
       importScripts(
-        '/packages/offline-data/worker/packages.javascript?' +
+        '/packages/offline-data/worker-packages.javascript?' +
         __meteor_runtime_config__.offlineDataWorker.hashes.packages
       );
       booted = true;

@@ -11559,7 +11559,7 @@ awwx.canonicalStringify = stringify;
 
 
 // ------------------------------------------------------------------------
-// packages/worker-agent/context.litcoffee.js
+// packages/offline-common/context.litcoffee.js
 
 (function(){ var Context, contextVar, getContext, resetContext, withContext;
 
@@ -11630,7 +11630,7 @@ resetContext = function(fn) {
 
 
 // ------------------------------------------------------------------------
-// packages/worker-agent/error.litcoffee.js
+// packages/offline-common/error.litcoffee.js
 
 (function(){ var ErrorDescription, Failed, bind, catcherr, defer, describeError, ensureString, getContext, logError, reportError, _base;
 
@@ -11770,7 +11770,7 @@ _.extend(((_base = (this.awwx || (this.awwx = {}))).Error || (_base.Error = {}))
 
 
 // ------------------------------------------------------------------------
-// packages/worker-agent/fanout.litcoffee.js
+// packages/offline-common/fanout.litcoffee.js
 
 (function(){ var Fanout, catcherr,
   __slice = [].slice;
@@ -11812,7 +11812,7 @@ Fanout = function() {
 
 
 // ------------------------------------------------------------------------
-// packages/worker-agent/result.litcoffee.js
+// packages/offline-common/result.litcoffee.js
 
 (function(){ var Fanout, Result, bind, catcherr, defer, reportError, _ref;
 
@@ -12120,7 +12120,72 @@ Result = (function() {
 
 
 // ------------------------------------------------------------------------
-// packages/worker-agent/contains.litcoffee.js
+// packages/offline-common/broadcast.litcoffee.js
+
+(function(){ var Fanout, broadcast, defer, onMessage, topic, topics, withContext,
+  __slice = [].slice;
+
+Fanout = awwx.Fanout;
+
+defer = awwx.Error.defer;
+
+withContext = awwx.Context.withContext;
+
+if (this.Agent != null) {
+  return;
+}
+
+topics = {};
+
+topic = function(messageTopic) {
+  return topics[messageTopic] || (topics[messageTopic] = new Fanout());
+};
+
+onMessage = function(messageTopic, args) {
+  withContext("received broadcast msg " + messageTopic, function() {
+    topic(messageTopic).apply(null, args);
+  });
+};
+
+Meteor.startup(function() {
+  if (!(typeof Offline !== "undefined" && Offline !== null ? Offline._usingSharedWebWorker : void 0)) {
+    Meteor.BrowserMsg.listen({
+      '/awwx/offline-data/broadcast': function(messageTopic, args) {
+        onMessage(messageTopic, args);
+      }
+    });
+  }
+});
+
+broadcast = function() {
+  var args, messageTopic;
+
+  messageTopic = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+  Meteor.BrowserMsg.send('/awwx/offline-data/broadcast', messageTopic, args);
+};
+
+broadcast.includingSelf = function() {
+  var args, messageTopic;
+
+  messageTopic = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+  Meteor.BrowserMsg.send('/awwx/offline-data/broadcast', messageTopic, args);
+  defer(function() {
+    return topic(messageTopic).apply(null, args);
+  });
+};
+
+broadcast.listen = function(messageTopic, callback) {
+  topic(messageTopic).listen(callback);
+};
+
+(this.Offline || (this.Offline = {}))._broadcast = broadcast;
+
+}).call(this);
+
+
+
+// ------------------------------------------------------------------------
+// packages/offline-common/contains.litcoffee.js
 
 (function(){ var contains;
 
@@ -12143,7 +12208,7 @@ contains = function(list, value) {
 
 
 // ------------------------------------------------------------------------
-// packages/worker-agent/database.litcoffee.js
+// packages/offline-common/database.litcoffee.js
 
 (function(){ var DATABASE_NAME, DATABASE_VERSION, Result, SQLStore, andthen, begin, bind, canonicalStringify, contains, getContext, getResponsible, global, now, placeholders, reportError, sqlRows, store, withContext, _ref, _ref1,
   __slice = [].slice;
@@ -13054,9 +13119,13 @@ Meteor.startup(function() {
 
 
 // ------------------------------------------------------------------------
-// packages/worker-agent/windows.litcoffee.js
+// packages/offline-common/windows.litcoffee.js
 
 (function(){ var Fanout, Result, becomeTheAgentWindow, broadcast, check, checking, currentlyTheAgent, db, deadWindows, defer, lastPing, noLongerAgent, notTheAgent, now, nowAgent, thisWindowId, unload, windowIdsAtLastCheck, withContext;
+
+if (this.Agent != null) {
+  return;
+}
 
 this.Offline || (this.Offline = {});
 
@@ -13082,17 +13151,6 @@ Offline._windows = {
   thisWindowId: thisWindowId
 };
 
-if (typeof Offline !== "undefined" && Offline !== null ? Offline._usingSharedWebWorker : void 0) {
-  return;
-}
-
-if (this.Agent != null) {
-  Meteor.startup(function() {
-    nowAgent();
-  });
-  return;
-}
-
 unload = function() {
   return withContext("unload", function() {
     broadcast('goodbye', thisWindowId);
@@ -13104,20 +13162,6 @@ window.addEventListener('unload', unload, false);
 windowIdsAtLastCheck = null;
 
 lastPing = null;
-
-broadcast.listen('ping', function() {
-  return withContext('listen ping', function() {
-    broadcast('pong', thisWindowId);
-  });
-});
-
-broadcast.listen('pong', function(windowId) {
-  return withContext('listen pong', function() {
-    if (windowIdsAtLastCheck != null) {
-      delete windowIdsAtLastCheck[windowId];
-    }
-  });
-});
 
 deadWindows = function(deadWindowIds) {
   return withContext("deadWindows", function() {
@@ -13163,14 +13207,6 @@ notTheAgent = function() {
     noLongerAgent();
   });
 };
-
-broadcast.listen('newAgent', function(windowId) {
-  return withContext("listen newAgent", function() {
-    if (windowId !== thisWindowId) {
-      notTheAgent();
-    }
-  });
-});
 
 now = function() {
   return +(new Date());
@@ -13222,9 +13258,28 @@ check = function() {
 
 Meteor.startup(function() {
   return withContext("windows startup", function() {
-    if (Offline._disableStartupForTesting) {
+    if (Offline._disableStartupForTesting || Offline._usingSharedWebWorker) {
       return;
     }
+    broadcast.listen('ping', function() {
+      return withContext("listen ping", function() {
+        broadcast('pong', thisWindowId);
+      });
+    });
+    broadcast.listen('pong', function(windowId) {
+      return withContext("listen pong", function() {
+        if (windowIdsAtLastCheck != null) {
+          delete windowIdsAtLastCheck[windowId];
+        }
+      });
+    });
+    broadcast.listen('newAgent', function(windowId) {
+      return withContext("listen newAgent", function() {
+        if (windowId !== thisWindowId) {
+          notTheAgent();
+        }
+      });
+    });
     db.transaction(function(tx) {
       return db.ensureWindow(tx, thisWindowId);
     }).then(function() {
@@ -13239,23 +13294,10 @@ Meteor.startup(function() {
 
 
 // ------------------------------------------------------------------------
-// packages/worker-agent/agent.litcoffee.js
+// packages/offline-common/agent.litcoffee.js
 
-(function(){ var CollectionAgent, ConnectionAgent, Result, addMessageHandler, addNewSubscriptionToDatabase, asAgentWindow, broadcast, broadcastUpdate, connectionAgentFor, contains, database, defer, handlers, justNameAndArgs, newConnectionAgent, nowAgent, sendQueuedMethods, serialize, subscribeToNewSubscriptions, subscriptionsUpdated, thisWindowId, updateSubscriptions, updateSubscriptionsReady, updateSubscriptionsReadyInTx, withContext, _ref,
+(function(){ var CollectionAgent, ConnectionAgent, Result, addMessageHandler, addNewSubscriptionToDatabase, asAgentWindow, broadcast, broadcastUpdate, connectionAgentFor, contains, database, defer, handlers, initializeAgent, justNameAndArgs, newConnectionAgent, nowAgent, sendQueuedMethods, serialize, subscribeToNewSubscriptions, subscriptionsUpdated, thisWindowId, updateSubscriptions, updateSubscriptionsReady, updateSubscriptionsReadyInTx, withContext, _ref,
   __slice = [].slice;
-
-if (typeof Offline !== "undefined" && Offline !== null ? Offline._usingSharedWebWorker : void 0) {
-  Offline._messageAgent = function() {
-    var args, topic;
-
-    topic = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-    Offline._sharedWebWorker.post({
-      msg: topic,
-      args: args
-    });
-  };
-  return;
-}
 
 contains = awwx.contains, Result = awwx.Result;
 
@@ -13265,13 +13307,33 @@ broadcast = Offline._broadcast;
 
 defer = awwx.Error.defer;
 
-_ref = Offline._windows, nowAgent = _ref.nowAgent, thisWindowId = _ref.thisWindowId;
-
 serialize = awwx.canonicalStringify;
 
 database = Offline._database;
 
 Offline._test || (Offline._test = {});
+
+if (this.Agent == null) {
+  _ref = Offline._windows, nowAgent = _ref.nowAgent, thisWindowId = _ref.thisWindowId;
+}
+
+Offline._messageAgent = function() {
+  var args, topic;
+
+  topic = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+  if (Offline._usingSharedWebWorker) {
+    Offline._sharedWebWorker.post({
+      msg: topic,
+      args: args
+    });
+  } else if (Offline._windows.currentlyTheAgent()) {
+    defer(function() {
+      return typeof handlers[topic] === "function" ? handlers[topic].apply(handlers, args) : void 0;
+    });
+  } else {
+    broadcast.apply(null, [topic].concat(__slice.call(args)));
+  }
+};
 
 if (this.Agent != null) {
   Agent.addMessageHandler('update', function(sourcePort, data) {
@@ -13311,18 +13373,6 @@ if (this.Agent != null) {
   };
   broadcastUpdate = function() {
     broadcast.includingSelf('update');
-  };
-  Offline._messageAgent = function() {
-    var args, topic;
-
-    topic = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-    if (Offline._windows.currentlyTheAgent()) {
-      if (typeof handlers[topic] === "function") {
-        handlers[topic].apply(handlers, args);
-      }
-    } else {
-      broadcast.apply(null, [topic].concat(__slice.call(args)));
-    }
   };
 }
 
@@ -13781,23 +13831,31 @@ subscriptionsUpdated = function() {
   });
 };
 
-addMessageHandler('subscriptionsUpdated', function() {
+initializeAgent = function() {
   updateSubscriptions();
-});
+  return sendQueuedMethods();
+};
 
-nowAgent.listen(function() {
-  updateSubscriptions();
-  sendQueuedMethods();
-});
-
-addMessageHandler('newQueuedMethod', function() {
-  sendQueuedMethods();
-});
-
-if (this.Agent == null) {
-  broadcast.listen('deadWindows', function() {
-    subscriptionsUpdated();
+Meteor.startup(function() {
+  if ((this.Agent == null) && Offline._usingSharedWebWorker) {
+    return;
+  }
+  addMessageHandler('subscriptionsUpdated', function() {
+    updateSubscriptions();
   });
-}
+  addMessageHandler('newQueuedMethod', function() {
+    sendQueuedMethods();
+  });
+  if (this.Agent == null) {
+    broadcast.listen('deadWindows', function() {
+      subscriptionsUpdated();
+    });
+  }
+  if (this.Agent != null) {
+    initializeAgent();
+  } else {
+    nowAgent.listen(initializeAgent);
+  }
+});
 
 }).call(this);

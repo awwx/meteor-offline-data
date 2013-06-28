@@ -8,7 +8,7 @@
 
     __meteor_runtime_config__.offlineDataWorker = {
       hashes: {
-        boot: hashFor('static/packages/offline-data/worker/boot.javascript')
-        packages: hashFor('static/packages/offline-data/worker/packages.javascript')
+        boot: hashFor('static/packages/offline-data/worker-boot.javascript')
+        packages: hashFor('static/packages/offline-data/worker-packages.javascript')
       }
     }
