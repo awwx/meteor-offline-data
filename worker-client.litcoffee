@@ -51,7 +51,15 @@ appcache generates for the app manifest.
 
 
     Worker.post = (data) ->
-      worker.port.postMessage data
+      worker.port.postMessage(
+        _.extend(data, {windowId: Offline._windows.thisWindowId})
+      )
+      return
+
+
+    Worker.addMessageHandler 'ping', (data) ->
+      Worker.post
+        msg: 'pong'
       return
 
 

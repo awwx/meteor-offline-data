@@ -3030,7 +3030,7 @@ EJSON._base64Decode = function (str) {
 // ------------------------------------------------------------------------
 // packages/logging/logging.coffee.js
 
-(function(){ var str,
+(function(){ var str, time, zeropad,
   __slice = [].slice;
 
 str = function(x) {
@@ -3041,11 +3041,25 @@ str = function(x) {
   }
 };
 
+zeropad = function(n, s) {
+  while (s.length < n) {
+    s = '0' + s;
+  }
+  return s;
+};
+
+time = function() {
+  var d;
+
+  d = new Date();
+  return zeropad(2, '' + d.getSeconds()) + '.' + zeropad(3, '' + d.getMilliseconds());
+};
+
 Meteor._debug = function() {
   var args;
 
   args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-  return Agent.log(_.map(args, str).join(' '));
+  return Agent.log(time() + ': ' + _.map(args, str).join(' '));
 };
 
 }).call(this);
@@ -11550,9 +11564,10 @@ function stringify(value, replacer, space) {
             return str('', {'': value});
         }
 
-if (typeof awwx === 'undefined')
-  this.awwx = {};
-awwx.canonicalStringify = stringify;
+
+// @export canonicalStringify
+
+canonicalStringify = stringify;
 
 }).call(this);
 
@@ -12210,7 +12225,7 @@ contains = function(list, value) {
 // ------------------------------------------------------------------------
 // packages/offline-common/database.litcoffee.js
 
-(function(){ var DATABASE_NAME, DATABASE_VERSION, Result, SQLStore, andthen, begin, bind, canonicalStringify, contains, getContext, getResponsible, global, now, placeholders, reportError, sqlRows, store, withContext, _ref, _ref1,
+(function(){ var DATABASE_NAME, DATABASE_VERSION, Result, SQLStore, andthen, begin, bind, contains, getContext, getResponsible, global, now, placeholders, reportError, sqlRows, store, withContext, _ref, _ref1,
   __slice = [].slice;
 
 DATABASE_NAME = 'awwx/offline-data';
@@ -12219,7 +12234,7 @@ DATABASE_VERSION = '5';
 
 global = this;
 
-canonicalStringify = awwx.canonicalStringify, contains = awwx.contains, Result = awwx.Result;
+contains = awwx.contains, Result = awwx.Result;
 
 _ref = awwx.Context, getContext = _ref.getContext, getResponsible = _ref.getResponsible, withContext = _ref.withContext;
 
@@ -12484,11 +12499,11 @@ SQLStore = (function() {
     }));
   };
 
-  SQLStore.prototype.readWindowIds = function(tx) {
+  SQLStore.prototype.readAllWindowIds = function(tx) {
     var _this = this;
 
-    return begin("readWindowsIds", (function() {
-      return _this.sql(tx, "SELECT windowId FROM windows");
+    return begin("readKnownWindowIds", (function() {
+      return _this.sql(tx, "SELECT windowId FROM windows UNION\nSELECT windowId FROM windowSubscriptions UNION\nSELECT windowId FROM agentWindow");
     }), (function(rows) {
       var row, _i, _len, _results;
 
@@ -12508,6 +12523,8 @@ SQLStore = (function() {
       return _this.sql(tx, "DELETE FROM windows\n  WHERE windowId IN (" + (placeholders(windowIds)) + ")", windowIds);
     }), (function() {
       return _this.sql(tx, "DELETE FROM windowSubscriptions\n  WHERE windowId IN (" + (placeholders(windowIds)) + ")", windowIds);
+    }), (function() {
+      return _this.sql(tx, "DELETE FROM agentWindow\n  WHERE windowId IN (" + (placeholders(windowIds)) + ")", windowIds);
     }));
   };
 
@@ -13121,11 +13138,7 @@ Meteor.startup(function() {
 // ------------------------------------------------------------------------
 // packages/offline-common/windows.litcoffee.js
 
-(function(){ var Fanout, Result, becomeTheAgentWindow, broadcast, check, checking, currentlyTheAgent, db, deadWindows, defer, lastPing, noLongerAgent, notTheAgent, now, nowAgent, thisWindowId, unload, windowIdsAtLastCheck, withContext;
-
-if (this.Agent != null) {
-  return;
-}
+(function(){ var Fanout, Result, becomeTheAgentWindow, broadcast, check, checkPongs, checking, currentlyTheAgent, db, deadWindows, defer, lastPing, noLongerAgent, notTheAgent, now, nowAgent, testingWindows, thisWindowId, unload, windowsAreDead, withContext;
 
 this.Offline || (this.Offline = {});
 
@@ -13139,155 +13152,197 @@ withContext = awwx.Context.withContext;
 
 db = Offline._database;
 
-thisWindowId = Random.id();
+Offline._windows = {};
 
-nowAgent = new Fanout();
-
-noLongerAgent = new Fanout();
-
-Offline._windows = {
-  nowAgent: nowAgent,
-  noLongerAgent: noLongerAgent,
-  thisWindowId: thisWindowId
-};
-
-unload = function() {
-  return withContext("unload", function() {
-    broadcast('goodbye', thisWindowId);
-  });
-};
-
-window.addEventListener('unload', unload, false);
-
-windowIdsAtLastCheck = null;
-
-lastPing = null;
-
-deadWindows = function(deadWindowIds) {
-  return withContext("deadWindows", function() {
-    return db.transaction(function(tx) {
-      return (deadWindowIds.length > 0 ? (broadcast('deadWindows', deadWindowIds), db.deleteWindows(tx, deadWindowIds)) : Result.completed()).then(function() {
-        return Result.join([db.readWindowIds(tx), db.readAgentWindow(tx)]);
-      }).then(function(_arg) {
-        var agentWindowId, windowIds;
-
-        windowIds = _arg[0], agentWindowId = _arg[1];
-        return (!((agentWindowId != null) && _.contains(windowIds, agentWindowId)) ? becomeTheAgentWindow(tx).then(function() {
-          return thisWindowId;
-        }) : Result.completed(agentWindowId)).then(function(agentWindowId) {});
-      });
-    });
-  });
-};
-
-currentlyTheAgent = false;
-
-Offline._windows.currentlyTheAgent = function() {
-  return currentlyTheAgent;
-};
-
-becomeTheAgentWindow = function(tx) {
-  return withContext("becomeTheAgentWindow", function() {
-    currentlyTheAgent = true;
-    defer(function() {
-      return nowAgent();
-    });
-    return db.writeAgentWindow(tx, thisWindowId).then(function() {
-      broadcast('newAgent', thisWindowId);
-    });
-  });
-};
-
-notTheAgent = function() {
-  return withContext("notTheAgent", function() {
-    if (!currentlyTheAgent) {
-      return;
-    }
-    currentlyTheAgent = false;
-    noLongerAgent();
-  });
-};
+Offline._windows.windowsAreDead = windowsAreDead = new Fanout();
 
 now = function() {
   return +(new Date());
 };
 
-checking = false;
+if (typeof Agent !== "undefined" && Agent !== null) {
+  deadWindows = function(windowIds) {
+    var windowId, _i, _len;
 
-check = function() {
-  return withContext("window check", function() {
-    if (checking) {
-      return;
+    for (_i = 0, _len = windowIds.length; _i < _len; _i++) {
+      windowId = windowIds[_i];
+      Agent.windowIsDead(windowId);
     }
-    checking = true;
-    return db.transaction(function(tx) {
-      return db.readWindowIds(tx);
-    }).then(function(windowIds) {
-      var windowId, _i, _len;
-
-      if ((lastPing != null) && now() - lastPing < 9000) {
+    windowsAreDead(windowIds);
+  };
+  checking = false;
+  lastPing = null;
+  testingWindows = {};
+  Agent.addMessageHandler('pong', function(port, data) {
+    if (testingWindows != null) {
+      delete testingWindows[data.windowId];
+    }
+  });
+  checkPongs = function() {
+    deadWindows(_.keys(testingWindows));
+    checking = false;
+    return testingWindows = null;
+  };
+  check = function() {
+    return withContext("window check", function() {
+      if (checking || (lastPing != null) && now() - lastPing < 9000) {
         return;
       }
-      windowIdsAtLastCheck = {};
-      for (_i = 0, _len = windowIds.length; _i < _len; _i++) {
-        windowId = windowIds[_i];
-        if (windowId !== thisWindowId) {
-          windowIdsAtLastCheck[windowId] = true;
-        }
-      }
-      broadcast('ping');
-      return Result.delay(4000).then(function() {
-        return windowIds;
-      });
-    }).then(function(windowIds) {
-      var dead, windowId, _i, _len;
+      checking = true;
+      db.transaction(function(tx) {
+        return db.readAllWindowIds(tx);
+      }).then(function(windowIds) {
+        var port, windowId, _i, _j, _k, _len, _len1, _len2, _ref, _ref1;
 
-      dead = [];
-      for (_i = 0, _len = windowIds.length; _i < _len; _i++) {
-        windowId = windowIds[_i];
-        if (windowIdsAtLastCheck[windowId]) {
-          dead.push(windowId);
+        testingWindows = {};
+        _ref = Agent.windowIds;
+        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+          windowId = _ref[_i];
+          testingWindows[windowId] = true;
         }
+        for (_j = 0, _len1 = windowIds.length; _j < _len1; _j++) {
+          windowId = windowIds[_j];
+          testingWindows[windowId] = true;
+        }
+        lastPing = now();
+        _ref1 = Agent.ports;
+        for (_k = 0, _len2 = _ref1.length; _k < _len2; _k++) {
+          port = _ref1[_k];
+          port.postMessage({
+            msg: 'ping'
+          });
+        }
+        Meteor.setTimeout(checkPongs, 4000);
+      });
+    });
+  };
+  Meteor.startup(function() {
+    check();
+    return Meteor.setInterval(check, 10000);
+  });
+} else {
+  Offline._windows.thisWindowId = thisWindowId = Random.id();
+  Offline._windows.nowAgent = nowAgent = new Fanout();
+  Offline._windows.noLongerAgent = noLongerAgent = new Fanout();
+  unload = function() {
+    return withContext("unload", function() {
+      broadcast('goodbye', thisWindowId);
+    });
+  };
+  window.addEventListener('unload', unload, false);
+  testingWindows = null;
+  lastPing = null;
+  checking = false;
+  deadWindows = function(deadWindowIds) {
+    return withContext("deadWindows", function() {
+      return db.transaction(function(tx) {
+        return db.readAgentWindow(tx).then(function(agentWindowId) {
+          if ((agentWindowId == null) || _.contains(deadWindowIds, agentWindowId)) {
+            return becomeTheAgentWindow(tx);
+          } else {
+            return Result.completed();
+          }
+        });
+      }).then(function() {
+        return windowsAreDead(deadWindowIds);
+      });
+    });
+  };
+  currentlyTheAgent = false;
+  Offline._windows.currentlyTheAgent = function() {
+    return currentlyTheAgent;
+  };
+  becomeTheAgentWindow = function(tx) {
+    return withContext("becomeTheAgentWindow", function() {
+      currentlyTheAgent = true;
+      defer(function() {
+        return nowAgent();
+      });
+      return db.writeAgentWindow(tx, thisWindowId).then(function() {
+        broadcast('newAgent', thisWindowId);
+      });
+    });
+  };
+  notTheAgent = function() {
+    return withContext("notTheAgent", function() {
+      if (!currentlyTheAgent) {
+        return;
       }
-      return deadWindows(dead);
-    }).then(function() {
-      return checking = false;
+      currentlyTheAgent = false;
+      noLongerAgent();
+    });
+  };
+  check = function() {
+    return withContext("window check", function() {
+      if (checking) {
+        return;
+      }
+      checking = true;
+      return db.transaction(function(tx) {
+        return db.readAllWindowIds(tx);
+      }).then(function(windowIds) {
+        var windowId, _i, _len;
+
+        if ((lastPing != null) && now() - lastPing < 9000) {
+          return;
+        }
+        testingWindows = {};
+        for (_i = 0, _len = windowIds.length; _i < _len; _i++) {
+          windowId = windowIds[_i];
+          if (windowId !== thisWindowId) {
+            testingWindows[windowId] = true;
+          }
+        }
+        broadcast('ping');
+        return Result.delay(4000).then(function() {
+          return windowIds;
+        });
+      }).then(function(windowIds) {
+        return deadWindows(_.keys(testingWindows));
+      }).then(function() {
+        return checking = false;
+      });
+    });
+  };
+  Meteor.startup(function() {
+    return withContext("windows startup", function() {
+      if (Offline._disableStartupForTesting) {
+        return;
+      }
+      if (Offline._usingSharedWebWorker) {
+        return db.transaction(function(tx) {
+          return db.ensureWindow(tx, thisWindowId);
+        });
+      } else {
+        broadcast.listen('ping', function() {
+          return withContext("listen ping", function() {
+            broadcast('pong', thisWindowId);
+          });
+        });
+        broadcast.listen('pong', function(windowId) {
+          return withContext("listen pong", function() {
+            if (testingWindows != null) {
+              delete testingWindows[windowId];
+            }
+          });
+        });
+        broadcast.listen('newAgent', function(windowId) {
+          return withContext("listen newAgent", function() {
+            if (windowId !== thisWindowId) {
+              notTheAgent();
+            }
+          });
+        });
+        db.transaction(function(tx) {
+          return db.ensureWindow(tx, thisWindowId);
+        }).then(function() {
+          check();
+          return Meteor.setInterval(check, 10000);
+        });
+      }
     });
   });
-};
-
-Meteor.startup(function() {
-  return withContext("windows startup", function() {
-    if (Offline._disableStartupForTesting || Offline._usingSharedWebWorker) {
-      return;
-    }
-    broadcast.listen('ping', function() {
-      return withContext("listen ping", function() {
-        broadcast('pong', thisWindowId);
-      });
-    });
-    broadcast.listen('pong', function(windowId) {
-      return withContext("listen pong", function() {
-        if (windowIdsAtLastCheck != null) {
-          delete windowIdsAtLastCheck[windowId];
-        }
-      });
-    });
-    broadcast.listen('newAgent', function(windowId) {
-      return withContext("listen newAgent", function() {
-        if (windowId !== thisWindowId) {
-          notTheAgent();
-        }
-      });
-    });
-    db.transaction(function(tx) {
-      return db.ensureWindow(tx, thisWindowId);
-    }).then(function() {
-      return check();
-    });
-    Meteor.setInterval(check, 10000);
-  });
-});
+}
 
 }).call(this);
 
@@ -13296,7 +13351,7 @@ Meteor.startup(function() {
 // ------------------------------------------------------------------------
 // packages/offline-common/agent.litcoffee.js
 
-(function(){ var CollectionAgent, ConnectionAgent, Result, addMessageHandler, addNewSubscriptionToDatabase, asAgentWindow, broadcast, broadcastUpdate, connectionAgentFor, contains, database, defer, handlers, initializeAgent, justNameAndArgs, newConnectionAgent, nowAgent, sendQueuedMethods, serialize, subscribeToNewSubscriptions, subscriptionsUpdated, thisWindowId, updateSubscriptions, updateSubscriptionsReady, updateSubscriptionsReadyInTx, withContext, _ref,
+(function(){ var CollectionAgent, ConnectionAgent, Result, addMessageHandler, addNewSubscriptionToDatabase, asAgentWindow, broadcast, broadcastUpdate, connectionAgentFor, contains, database, defer, handlers, initializeAgent, initialized, justNameAndArgs, newConnectionAgent, nowAgent, sendQueuedMethods, subscribeToNewSubscriptions, subscriptionsUpdated, thisWindowId, updateSubscriptions, updateSubscriptionsReady, updateSubscriptionsReadyInTx, windowsAreDead, withContext, _ref,
   __slice = [].slice;
 
 contains = awwx.contains, Result = awwx.Result;
@@ -13307,8 +13362,6 @@ broadcast = Offline._broadcast;
 
 defer = awwx.Error.defer;
 
-serialize = awwx.canonicalStringify;
-
 database = Offline._database;
 
 Offline._test || (Offline._test = {});
@@ -13317,11 +13370,15 @@ if (this.Agent == null) {
   _ref = Offline._windows, nowAgent = _ref.nowAgent, thisWindowId = _ref.thisWindowId;
 }
 
+windowsAreDead = Offline._windows.windowsAreDead;
+
 Offline._messageAgent = function() {
   var args, topic;
 
   topic = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-  if (Offline._usingSharedWebWorker) {
+  if (this.Agent != null) {
+    throw new Error("oops, messaging agent from agent");
+  } else if (Offline._usingSharedWebWorker) {
     Offline._sharedWebWorker.post({
       msg: topic,
       args: args
@@ -13507,7 +13564,7 @@ ConnectionAgent = (function() {
   };
 
   ConnectionAgent.prototype._alreadyHaveMeteorSubscription = function(subscription) {
-    return !!this.meteorSubscriptionHandles[serialize(subscription)];
+    return !!this.meteorSubscriptionHandles[canonicalStringify(subscription)];
   };
 
   ConnectionAgent.prototype.allMeteorSubscriptionsReady = function() {
@@ -13575,7 +13632,7 @@ ConnectionAgent = (function() {
     _ref1 = this.oldSubscriptions(subscriptions);
     for (_i = 0, _len = _ref1.length; _i < _len; _i++) {
       subscription = _ref1[_i];
-      serialized = serialize(subscription);
+      serialized = canonicalStringify(subscription);
       this.meteorSubscriptionHandles[serialized].stop();
       delete this.meteorSubscriptionHandles[serialized];
     }
@@ -13590,7 +13647,7 @@ ConnectionAgent = (function() {
     handle = Meteor.subscribe.apply(Meteor, [name].concat(__slice.call(args), [function() {
       _this.meteorSubscriptionReady(subscription);
     }]));
-    this.meteorSubscriptionHandles[serialize(subscription)] = handle;
+    this.meteorSubscriptionHandles[canonicalStringify(subscription)] = handle;
   };
 
   ConnectionAgent.prototype.newSubscriptions = function(subscriptions) {
@@ -13615,7 +13672,6 @@ ConnectionAgent = (function() {
     subscriptions = _.map(subscriptions, justNameAndArgs);
     this.stopOldSubscriptions(subscriptions);
     this.startNewSubscriptions(subscriptions);
-    return Result.completed();
   };
 
   ConnectionAgent.prototype.checkIfDocumentNowFree = function(tx, collectionName, docId) {
@@ -13696,21 +13752,19 @@ sendQueuedMethods = function() {
 };
 
 subscribeToNewSubscriptions = function(subscriptions) {
-  var connectionAgent, connectionName, connectionSubscriptions, results, subscription, _i, _len;
+  var connectionAgent, connectionName, connectionSubscriptions, subscription, _i, _len;
 
   for (_i = 0, _len = subscriptions.length; _i < _len; _i++) {
     subscription = subscriptions[_i];
     connectionAgentFor(subscription.connection);
   }
-  results = [];
   for (connectionName in connectionAgents) {
     connectionAgent = connectionAgents[connectionName];
     connectionSubscriptions = _.filter(subscriptions, function(subscription) {
       return subscription.connection === connectionName;
     });
-    results.push(connectionAgent.updateSubscriptions(connectionSubscriptions));
+    connectionAgent.updateSubscriptions(connectionSubscriptions);
   }
-  return Result.join(results);
 };
 
 CollectionAgent = (function() {
@@ -13778,7 +13832,7 @@ CollectionAgent = (function() {
       if (wasWritten) {
         return;
       }
-      return (doc != null ? database.writeDoc(tx, _this.connectionName, _this.collectionName, doc) : database.deleteDoc(tx, _this.connectionname, _this.collectionName, docId)).then(function() {
+      return (doc != null ? database.writeDoc(tx, _this.connectionName, _this.collectionName, doc) : database.deleteDoc(tx, _this.connectionName, _this.collectionName, docId)).then(function() {
         return _this.addDocumentUpdate(tx, docId, doc);
       });
     });
@@ -13831,10 +13885,29 @@ subscriptionsUpdated = function() {
   });
 };
 
+initialized = new Result();
+
 initializeAgent = function() {
-  updateSubscriptions();
-  return sendQueuedMethods();
+  return sendQueuedMethods().then(function() {
+    return initialized.complete();
+  });
 };
+
+windowsAreDead.listen(function(deadWindowIds) {
+  initialized.then(function() {
+    asAgentWindow(function(tx) {
+      return database.deleteWindows(tx, deadWindowIds).then(function() {
+        return database.cleanSubscriptions(tx);
+      }).then(function() {
+        return database.readMergedSubscriptions(tx);
+      }).then(function(subscriptions) {
+        return subscribeToNewSubscriptions(subscriptions);
+      }).then(function() {
+        return updateSubscriptionsReadyInTx(tx);
+      });
+    });
+  });
+});
 
 Meteor.startup(function() {
   if ((this.Agent == null) && Offline._usingSharedWebWorker) {
@@ -13846,11 +13919,6 @@ Meteor.startup(function() {
   addMessageHandler('newQueuedMethod', function() {
     sendQueuedMethods();
   });
-  if (this.Agent == null) {
-    broadcast.listen('deadWindows', function() {
-      subscriptionsUpdated();
-    });
-  }
   if (this.Agent != null) {
     initializeAgent();
   } else {

@@ -1,7 +1,6 @@
     {contains, Result} = awwx
     broadcast = Offline._broadcast
     {defer} = awwx.Error
-    serialize = awwx.canonicalStringify
     database = Offline._database
     {thisWindowId} = Offline._windows
     {withContext} = awwx.Context
@@ -33,7 +32,7 @@ An offline subscription is ready when:
     subscriptionReady = {}
 
     getSubscriptionReady = (subscription) ->
-      serialized = serialize(subscription)
+      serialized = canonicalStringify(subscription)
       dep = (subscriptionReadyDeps[serialized] or= new Deps.Dependency)
       dep.depend()
       unless subscriptionReady[serialized]?
@@ -181,7 +180,8 @@ TODO support `onError` (will need to store error in database)
         computation = Deps.autorun ->
           if handle.ready()
             onReady()
-            computation.stop()
+            computation.stop() if computation
+            computation = null
           return
 
         return handle
@@ -440,7 +440,7 @@ All windows listen for updates from the agent window.
 
     processSubscriptionReady = (update) ->
       {subscription} = update
-      setSubscriptionReady serialize(subscription), true
+      setSubscriptionReady canonicalStringify(subscription), true
       return
 
     processUpdate = (update) ->
@@ -448,7 +448,7 @@ All windows listen for updates from the agent window.
         when 'documentUpdated'   then processDocumentUpdated(update)
         when 'subscriptionReady' then processSubscriptionReady(update)
         else
-          throw new Error "unknown update: " + serialize(update)
+          throw new Error "unknown update: " + canonicalStringify(update)
       return
 
 
@@ -478,7 +478,7 @@ TODO getting called a lot
       .then((subscriptions) ->
         for subscription in subscriptions
           if subscription.ready
-            setSubscriptionReady serialize(_.pick(subscription, ['connection', 'name', 'args'])), true
+            setSubscriptionReady canonicalStringify(_.pick(subscription, ['connection', 'name', 'args'])), true
         return
       )
 
