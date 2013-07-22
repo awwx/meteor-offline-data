@@ -21,7 +21,7 @@ See the
 
 ## Version
 
-0.0.4 early alpha release.
+0.0.5 early alpha release.
 
 Major gaps:
 
@@ -33,10 +33,14 @@ Major gaps:
 
 * [no support for accounts](https://github.com/awwx/meteor-offline-data/issues/2)
 
-* [iOS needs unsubscription support](https://github.com/awwx/meteor-offline-data/issues/19)
-
 See the [issues list](https://github.com/awwx/meteor-offline-data/issues)
 for the full known TODO list.
+
+
+## Community Funded
+
+Development of the Offline Data package is funded by contributors to
+the [Meteor Offline Data Campaign](http://offline-data.meteor.com/).
 
 
 ## Offline Data Package
@@ -226,7 +230,7 @@ server documents, and then accepting, rejecting, or perhaps merging
 updates in a server method.
 
 
-### Incremental loading of large data sets
+### Incremental Loading of Large Data Sets
 
 The offline-data package makes a standard Meteor subscription to
 receive data, which means that just like with a regular Meteor
@@ -269,9 +273,3 @@ Communication for regular (non-offline) Meteor collections, Meteor
 methods, and the hot code reload notification go through the
 individual window's livedata connection as usual, in the same way as
 when the offline-data packages isn't being used.
-
-
-## Fundraiser ##
-
-This work is being made possible by contributors to the
-[Meteor Offline Data Campaign](http://offline-data.meteor.com/).
