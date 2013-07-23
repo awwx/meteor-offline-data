@@ -1,3 +1,10 @@
+## v0.0.5
+
+Implement dead window detection for the shared web worker, fixing #19.
+
+Use canonical-stringify v1.1
+
+
 ## v0.0.4
 
 Fix problem with confusing Meteorite.  Move common code used by both
