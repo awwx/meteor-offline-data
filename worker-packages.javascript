@@ -12065,6 +12065,19 @@ Result = (function() {
     return finalResult;
   };
 
+  Result.map = function(array, fn) {
+    var item, result, results, _i, _len;
+
+    results = [];
+    for (_i = 0, _len = array.length; _i < _len; _i++) {
+      item = array[_i];
+      result = new Result;
+      result._run(fn, item);
+      results.push(result);
+    }
+    return Result.join(results);
+  };
+
   Result.sequence = function(input, fns) {
     var finalResult, i, next;
 
@@ -12225,18 +12238,18 @@ contains = function(list, value) {
 // ------------------------------------------------------------------------
 // packages/offline-common/database.litcoffee.js
 
-(function(){ var DATABASE_NAME, DATABASE_VERSION, Result, SQLStore, andthen, begin, bind, contains, getContext, getResponsible, global, now, placeholders, reportError, sqlRows, store, withContext, _ref, _ref1,
+(function(){ var DATABASE_NAME, DATABASE_VERSION, Result, SQLStore, andthen, begin, bind, contains, getContext, global, now, placeholders, reportError, sqlRows, store, withContext, _ref, _ref1,
   __slice = [].slice;
 
 DATABASE_NAME = 'awwx/offline-data';
 
-DATABASE_VERSION = '5';
+DATABASE_VERSION = '8';
 
 global = this;
 
 contains = awwx.contains, Result = awwx.Result;
 
-_ref = awwx.Context, getContext = _ref.getContext, getResponsible = _ref.getResponsible, withContext = _ref.withContext;
+_ref = awwx.Context, getContext = _ref.getContext, withContext = _ref.withContext;
 
 _ref1 = awwx.Error, bind = _ref1.bind, reportError = _ref1.reportError;
 
@@ -12445,7 +12458,7 @@ SQLStore = (function() {
     var _this = this;
 
     return begin("createTables", function() {
-      return Result.join([_this.sql(tx, "CREATE TABLE windows (\n  windowId TEXT PRIMARY KEY NOT NULL,\n  updateId INTEGER NOT NULL\n)"), _this.sql(tx, "CREATE TABLE agentWindow (\n  singleton INTEGER PRIMARY KEY NOT NULL,\n  windowId TEXT NOT NULL\n)"), _this.sql(tx, "CREATE TABLE docs (\n  connection TEXT NOT NULL,\n  collectionName TEXT NOT NULL,\n  docId TEXT NOT NULL,\n  doc TEXT NOT NULL,\n  PRIMARY KEY (connection, collectionName, docId)\n)"), _this.sql(tx, "CREATE TABLE stubDocs (\n  connection TEXT NOT NULL,\n  methodId TEXT NOT NULL,\n  collectionName TEXT NOT NULL,\n  docId TEXT NOT NULL,\n  PRIMARY KEY (connection, methodId, collectionName, docId)\n)"), _this.sql(tx, "CREATE TABLE queuedMethods (\n  connection TEXT NOT NULL,\n  methodId TEXT NOT NULL,\n  method TEXT NOT NULL,\n  PRIMARY KEY (connection, methodId)\n)"), _this.sql(tx, "CREATE TABLE windowSubscriptions (\n  windowId TEXT NOT NULL,\n  connection TEXT NOT NULL,\n  subscription TEXT NOT NULL,\n  PRIMARY KEY (windowId, connection, subscription)\n)"), _this.sql(tx, "CREATE TABLE subscriptions (\n  connection TEXT NOT NULL,\n  subscription TEXT NOT NULL,\n  readyFromServer INTEGER NOT NULL,\n  ready INTEGER NOT NULL,\n  PRIMARY KEY (connection, subscription)\n)"), _this.sql(tx, "CREATE TABLE methodsHoldingUpSubscriptions (\n  connection TEXT NOT NULL,\n  subscription TEXT NOT NULL,\n  methodId TEXT NOT NULL,\n  PRIMARY KEY (connection, subscription, methodId)\n)"), _this.sql(tx, "CREATE TABLE updates (\n  id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\n  theUpdate TEXT NOT NULL\n)")]);
+      return Result.join([_this.sql(tx, "CREATE TABLE windows (\n  windowId TEXT PRIMARY KEY NOT NULL,\n  updateId INTEGER NOT NULL\n)"), _this.sql(tx, "CREATE TABLE agentWindow (\n  singleton INTEGER PRIMARY KEY NOT NULL,\n  windowId TEXT NOT NULL\n)"), _this.sql(tx, "CREATE TABLE docs (\n  connection TEXT NOT NULL,\n  collectionName TEXT NOT NULL,\n  docId TEXT NOT NULL,\n  doc TEXT NOT NULL,\n  PRIMARY KEY (connection, collectionName, docId)\n)"), _this.sql(tx, "CREATE TABLE stubDocs (\n  connection TEXT NOT NULL,\n  methodId TEXT NOT NULL,\n  collectionName TEXT NOT NULL,\n  docId TEXT NOT NULL,\n  PRIMARY KEY (connection, methodId, collectionName, docId)\n)"), _this.sql(tx, "CREATE TABLE queuedMethods (\n  connection TEXT NOT NULL,\n  methodId TEXT NOT NULL,\n  method TEXT NOT NULL,\n  PRIMARY KEY (connection, methodId)\n)"), _this.sql(tx, "CREATE TABLE windowSubscriptions (\n  windowId TEXT NOT NULL,\n  connection TEXT NOT NULL,\n  subscription TEXT NOT NULL,\n  PRIMARY KEY (windowId, connection, subscription)\n)"), _this.sql(tx, "CREATE TABLE subscriptions (\n  connection TEXT NOT NULL,\n  subscription TEXT NOT NULL,\n  serverReady INTEGER NOT NULL,\n  status TEXT NOT NULL,\n  error TEXT NOT NULL,\n  loaded INTEGER NOT NULL,\n  PRIMARY KEY (connection, subscription)\n)"), _this.sql(tx, "CREATE TABLE methodsHoldingUpSubscriptions (\n  connection TEXT NOT NULL,\n  subscription TEXT NOT NULL,\n  methodId TEXT NOT NULL,\n  PRIMARY KEY (connection, subscription, methodId)\n)"), _this.sql(tx, "CREATE TABLE updates (\n  id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\n  theUpdate TEXT NOT NULL\n)")]);
     });
   };
 
@@ -12495,7 +12508,9 @@ SQLStore = (function() {
     var _this = this;
 
     return begin("ensureWindow", (function() {
-      return _this.sql(tx, "INSERT OR IGNORE INTO windows (windowId, updateId)\n  VALUES (?, 0)", [windowId]);
+      return _this.highestUpdateId(tx);
+    }), (function(updateId) {
+      return _this.sql(tx, "INSERT OR IGNORE INTO windows (windowId, updateId)\n  VALUES (?, ?)", [windowId, updateId]);
     }));
   };
 
@@ -12709,7 +12724,25 @@ SQLStore = (function() {
         name: name,
         args: args
       });
-      return _this.sql(tx, "INSERT INTO windowSubscriptions\n  (windowId, connection, subscription)\n  VALUES (?, ?, ?)", [windowId, connection, subscription]);
+      return _this.sql(tx, "INSERT OR IGNORE INTO windowSubscriptions\n  (windowId, connection, subscription)\n  VALUES (?, ?, ?)", [windowId, connection, subscription]);
+    }));
+  };
+
+  SQLStore.prototype.setWindowSubscriptions = function(tx, windowId, connection, subscriptions) {
+    var _this = this;
+
+    return begin("setWindowSubscriptions", (function() {
+      return _this.sql(tx, "DELETE FROM windowSubscriptions\n  WHERE windowId = ? AND connection = ?", [windowId, connection]);
+    }), (function() {
+      return Result.map(subscriptions, (function(subscription) {
+        var serialized;
+
+        serialized = canonicalStringify({
+          name: subscription[0],
+          args: subscription.slice(1)
+        });
+        return _this.sql(tx, "INSERT INTO windowSubscriptions\n  (windowId, connection, subscription)\n  VALUES (?, ?, ?)", [windowId, connection, serialized]);
+      }));
     }));
   };
 
@@ -12782,7 +12815,15 @@ SQLStore = (function() {
         name: name,
         args: args
       });
-      return _this.sql(tx, "INSERT OR IGNORE INTO subscriptions\n  (connection, subscription, readyFromServer, ready)\n  VALUES (?, ?, 0, 0)", [connection, subscription]);
+      return _this.sql(tx, "INSERT OR IGNORE INTO subscriptions\n  (connection, subscription, serverReady, loaded, status, error)\n  VALUES (?, ?, 0, 0, 'subscribing', '')", [connection, subscription]);
+    }));
+  };
+
+  SQLStore.prototype.initializeSubscriptions = function(tx) {
+    var _this = this;
+
+    return begin("initializeSubscriptions", (function() {
+      return _this.sql(tx, "UPDATE subscriptions\n  SET serverReady = 0,\n      status = 'unsubscribed',\n      error = ''");
     }));
   };
 
@@ -12797,14 +12838,6 @@ SQLStore = (function() {
         args: args
       });
       return _this.sql(tx, "DELETE FROM subscriptions\n  WHERE connection = ? AND\n        subscription = ?", [connection, subscription]);
-    }));
-  };
-
-  SQLStore.prototype.addSubscriptionForWindow = function(tx, windowId, connection, name, args) {
-    var _this = this;
-
-    return begin("addSubscriptionForWindow", (function() {
-      return Result.join([_this.addWindowSubscription(tx, windowId, connection, name, args), _this.ensureSubscription(tx, connection, name, args)]);
     }));
   };
 
@@ -12837,7 +12870,47 @@ SQLStore = (function() {
         _ref3 = toDelete[_j], connection = _ref3.connection, name = _ref3.name, args = _ref3.args;
         writes.push(_this.removeSubscription(tx, connection, name, args));
       }
-      return Result.join(writes);
+      return Result.join(writes).then(function() {
+        return toDelete;
+      });
+    }));
+  };
+
+  SQLStore.prototype._loadSubscription = function(row) {
+    var args, name, o, _ref2;
+
+    _ref2 = EJSON.parse(row.subscription), name = _ref2.name, args = _ref2.args;
+    o = {
+      connection: row.connection,
+      name: name,
+      args: args,
+      serverReady: row.serverReady === 1,
+      status: row.status,
+      loaded: row.loaded === 1
+    };
+    if (row.error !== '') {
+      o.error = EJSON.parse(row.error);
+    }
+    return o;
+  };
+
+  SQLStore.prototype.readSubscription = function(tx, connection, name, args) {
+    var _this = this;
+
+    return begin("readSubscription", (function() {
+      var subscription;
+
+      subscription = canonicalStringify({
+        name: name,
+        args: args
+      });
+      return _this.sql(tx, "SELECT connection, subscription, serverReady, status,\n       error, loaded\n  FROM subscriptions\n  WHERE connection=? AND subscription=?", [connection, subscription]);
+    }), (function(rows) {
+      if (rows.length === 0) {
+        return null;
+      } else {
+        return _this._loadSubscription(rows[0]);
+      }
     }));
   };
 
@@ -12845,23 +12918,9 @@ SQLStore = (function() {
     var _this = this;
 
     return begin("readSubscriptions", (function() {
-      return _this.sql(tx, "SELECT connection, subscription, readyFromServer, ready\n  FROM subscriptions\n  ORDER BY connection, subscription");
+      return _this.sql(tx, "SELECT connection, subscription, serverReady, status,\n       error, loaded\n  FROM subscriptions\n  ORDER BY connection, subscription");
     }), (function(rows) {
-      var args, name, output, row, _i, _len, _ref2;
-
-      output = [];
-      for (_i = 0, _len = rows.length; _i < _len; _i++) {
-        row = rows[_i];
-        _ref2 = EJSON.parse(row.subscription), name = _ref2.name, args = _ref2.args;
-        output.push({
-          connection: row.connection,
-          name: name,
-          args: args,
-          readyFromServer: row.readyFromServer === 1,
-          ready: row.ready === 1
-        });
-      }
-      return output;
+      return _.map(rows, _this._loadSubscription);
     }));
   };
 
@@ -12881,17 +12940,31 @@ SQLStore = (function() {
     }));
   };
 
-  SQLStore.prototype.setSubscriptionReadyFromServer = function(tx, connection, name, args) {
+  SQLStore.prototype.setSubscriptionServerReady = function(tx, connection, name, args) {
     var _this = this;
 
-    return begin("setSubscriptionReadyFromServer", (function() {
+    return begin("setSubscriptionServerReady", (function() {
       var subscription;
 
       subscription = canonicalStringify({
         name: name,
         args: args
       });
-      return _this.sql(tx, "UPDATE subscriptions SET readyFromServer=1\n  WHERE connection=? AND\n        subscription=?", [connection, subscription]);
+      return _this.sql(tx, "UPDATE subscriptions SET serverReady = 1\n  WHERE connection=? AND\n        subscription=?", [connection, subscription]);
+    }));
+  };
+
+  SQLStore.prototype.setSubscriptionStatus = function(tx, connection, name, args, status) {
+    var _this = this;
+
+    return begin("setSubscriptionStatus", (function() {
+      var subscription;
+
+      subscription = canonicalStringify({
+        name: name,
+        args: args
+      });
+      return _this.sql(tx, "UPDATE subscriptions SET status=?\n  WHERE connection=? AND\n        subscription=?", [status, connection, subscription]);
     }));
   };
 
@@ -12905,7 +12978,35 @@ SQLStore = (function() {
         name: name,
         args: args
       });
-      return _this.sql(tx, "UPDATE subscriptions SET ready=1\n  WHERE connection=? AND\n        subscription=?", [connection, subscription]);
+      return _this.sql(tx, "UPDATE subscriptions SET status = 'ready', loaded = 1\n  WHERE connection = ? AND subscription = ?", [connection, subscription]);
+    }));
+  };
+
+  SQLStore.prototype.setSubscriptionError = function(tx, connection, name, args, error) {
+    var _this = this;
+
+    return begin("setSubscriptionError", (function() {
+      var subscription;
+
+      subscription = canonicalStringify({
+        name: name,
+        args: args
+      });
+      return _this.sql(tx, "UPDATE subscriptions\n  SET serverReady = 0, status = 'error', error = ?, loaded = 0\n  WHERE connection = ? AND\n        subscription = ?", [EJSON.stringify(error), connection, subscription]);
+    }));
+  };
+
+  SQLStore.prototype.setSubscriptionLoaded = function(tx, connection, name, args) {
+    var _this = this;
+
+    return begin("setSubscriptionLoaded", (function() {
+      var subscription;
+
+      subscription = canonicalStringify({
+        name: name,
+        args: args
+      });
+      return _this.sql(tx, "UPDATE subscriptions SET loaded = 1\n  WHERE connection=? AND\n        subscription=?", [connection, subscription]);
     }));
   };
 
@@ -12995,7 +13096,7 @@ SQLStore = (function() {
     }));
   };
 
-  SQLStore.prototype._parseUpdates = function(rows) {
+  SQLStore.prototype._loadUpdates = function(rows) {
     var output, row, _i, _len;
 
     output = [];
@@ -13015,7 +13116,7 @@ SQLStore = (function() {
     return begin("_testReadUpdates", (function() {
       return _this.sql(tx, "SELECT id, theUpdate FROM updates ORDER BY id");
     }), (function(rows) {
-      return _this._parseUpdates(rows);
+      return _this._loadUpdates(rows);
     }));
   };
 
@@ -13088,7 +13189,7 @@ SQLStore = (function() {
       updates = (function() {
         var _i, _len, _ref2, _results;
 
-        _ref2 = this._parseUpdates(rows);
+        _ref2 = this._loadUpdates(rows);
         _results = [];
         for (_i = 0, _len = _ref2.length; _i < _len; _i++) {
           update = _ref2[_i];
@@ -13125,7 +13226,7 @@ if (global.openDatabase) {
 }
 
 Meteor.startup(function() {
-  if (Offline._disableStartupForTesting) {
+  if (Offline._disableStartupForTesting || !Offline.supported) {
     return;
   }
   store.open();
@@ -13138,9 +13239,11 @@ Meteor.startup(function() {
 // ------------------------------------------------------------------------
 // packages/offline-common/windows.litcoffee.js
 
-(function(){ var Fanout, Result, becomeTheAgentWindow, broadcast, check, checkPongs, checking, currentlyTheAgent, db, deadWindows, defer, lastPing, noLongerAgent, notTheAgent, now, nowAgent, testingWindows, thisWindowId, unload, windowsAreDead, withContext;
+(function(){ var Fanout, Result, becomeTheAgentWindow, broadcast, check, checkPongs, checking, currentlyTheAgent, db, deadWindows, defer, lastPing, now, nowAgent, startupCheck, testingWindows, thisWindowId, unload, windowsAreDead, withContext;
 
-this.Offline || (this.Offline = {});
+if (!Offline.supported) {
+  return;
+}
 
 Fanout = awwx.Fanout, Result = awwx.Result;
 
@@ -13173,6 +13276,9 @@ if (typeof Agent !== "undefined" && Agent !== null) {
   checking = false;
   lastPing = null;
   testingWindows = {};
+  Agent.addMessageHandler('goodbye', function(port, data) {
+    deadWindows([data.windowId]);
+  });
   Agent.addMessageHandler('pong', function(port, data) {
     if (testingWindows != null) {
       delete testingWindows[data.windowId];
@@ -13223,13 +13329,6 @@ if (typeof Agent !== "undefined" && Agent !== null) {
 } else {
   Offline._windows.thisWindowId = thisWindowId = Random.id();
   Offline._windows.nowAgent = nowAgent = new Fanout();
-  Offline._windows.noLongerAgent = noLongerAgent = new Fanout();
-  unload = function() {
-    return withContext("unload", function() {
-      broadcast('goodbye', thisWindowId);
-    });
-  };
-  window.addEventListener('unload', unload, false);
   testingWindows = null;
   lastPing = null;
   checking = false;
@@ -13258,18 +13357,27 @@ if (typeof Agent !== "undefined" && Agent !== null) {
       defer(function() {
         return nowAgent();
       });
-      return db.writeAgentWindow(tx, thisWindowId).then(function() {
-        broadcast('newAgent', thisWindowId);
-      });
+      return db.writeAgentWindow(tx, thisWindowId);
     });
   };
-  notTheAgent = function() {
-    return withContext("notTheAgent", function() {
-      if (!currentlyTheAgent) {
-        return;
-      }
-      currentlyTheAgent = false;
-      noLongerAgent();
+  startupCheck = function() {
+    return withContext("startupCheck", function() {
+      return db.transaction(function(tx) {
+        return db.readAgentWindow(tx).then(function(agentWindowId) {
+          var closedAgentWindow;
+
+          if (agentWindowId == null) {
+            return becomeTheAgentWindow(tx);
+          } else {
+            closedAgentWindow = localStorage.getItem('/awwx/offline-data/agentWindowClosed');
+            if (closedAgentWindow === agentWindowId) {
+              return becomeTheAgentWindow(tx);
+            }
+          }
+        }).then(function() {
+          localStorage.removeItem('/awwx/offline-data/agentWindowClosed');
+        });
+      });
     });
   };
   check = function() {
@@ -13326,15 +13434,13 @@ if (typeof Agent !== "undefined" && Agent !== null) {
             }
           });
         });
-        broadcast.listen('newAgent', function(windowId) {
-          return withContext("listen newAgent", function() {
-            if (windowId !== thisWindowId) {
-              notTheAgent();
-            }
-          });
+        broadcast.listen('goodbye', function(windowId) {
+          return deadWindows([windowId]);
         });
         db.transaction(function(tx) {
           return db.ensureWindow(tx, thisWindowId);
+        }).then(function() {
+          return startupCheck();
         }).then(function() {
           check();
           return Meteor.setInterval(check, 10000);
@@ -13342,6 +13448,24 @@ if (typeof Agent !== "undefined" && Agent !== null) {
       }
     });
   });
+  unload = function() {
+    return withContext("unload", function() {
+      if (Offline._usingSharedWebWorker) {
+        Offline._sharedWebWorker.post({
+          msg: 'goodbye',
+          windowId: thisWindowId
+        });
+      } else {
+        if (currentlyTheAgent) {
+          localStorage.setItem('/awwx/offline-data/agentWindowClosed', thisWindowId);
+        }
+        broadcast('goodbye', thisWindowId);
+      }
+    });
+  };
+  if (window.addEventListener != null) {
+    window.addEventListener('unload', unload, false);
+  }
 }
 
 }).call(this);
@@ -13351,8 +13475,12 @@ if (typeof Agent !== "undefined" && Agent !== null) {
 // ------------------------------------------------------------------------
 // packages/offline-common/agent.litcoffee.js
 
-(function(){ var CollectionAgent, ConnectionAgent, Result, addMessageHandler, addNewSubscriptionToDatabase, asAgentWindow, broadcast, broadcastUpdate, connectionAgentFor, contains, database, defer, handlers, initializeAgent, initialized, justNameAndArgs, newConnectionAgent, nowAgent, sendQueuedMethods, subscribeToNewSubscriptions, subscriptionsUpdated, thisWindowId, updateSubscriptions, updateSubscriptionsReady, updateSubscriptionsReadyInTx, windowsAreDead, withContext, _ref,
+(function(){ var CollectionAgent, ConnectionAgent, Result, addMessageHandler, addUpdate, asAgentWindow, broadcast, broadcastStatusOfSubscription, broadcastSubscriptionStatus, broadcastUpdate, cleanSubscriptions, connectionAgentFor, contains, database, defer, handlers, initializeAgent, initialized, justNameAndArgs, newConnectionAgent, nowAgent, sendQueuedMethods, sendQueuedMethodsInTx, subscribeToSubscriptions, thisWindowId, updateSubscriptionsReady, windowSubscriptionsUpdated, windowsAreDead, withContext, withUpdateTracking, _ref,
   __slice = [].slice;
+
+if (!Offline.supported) {
+  return;
+}
 
 contains = awwx.contains, Result = awwx.Result;
 
@@ -13433,16 +13561,52 @@ if (this.Agent != null) {
   };
 }
 
-updateSubscriptionsReadyInTx = function(tx) {
-  return withContext("updateSubscriptionsReadyInTx", function() {
+addUpdate = function(tx, trackUpdate, update) {
+  if (trackUpdate != null) {
+    trackUpdate.madeUpdate = true;
+  }
+  return database.addUpdate(tx, update);
+};
+
+broadcastStatusOfSubscription = function(tx, trackUpdate, subscription) {
+  var status;
+
+  status = {
+    status: subscription.status,
+    loaded: subscription.loaded
+  };
+  if (subscription.error != null) {
+    status.error = subscription.error;
+  }
+  return addUpdate(tx, trackUpdate, {
+    update: 'subscriptionStatus',
+    subscription: {
+      connection: subscription.connection,
+      name: subscription.name,
+      args: subscription.args
+    },
+    status: status
+  });
+};
+
+broadcastSubscriptionStatus = function(tx, trackUpdate, connection, name, args) {
+  var _this = this;
+
+  return database.readSubscription(tx, connection, name, args).then(function(subscription) {
+    return broadcastStatusOfSubscription(tx, trackUpdate, subscription);
+  });
+};
+
+updateSubscriptionsReady = function(tx, trackUpdate) {
+  return withContext("updateSubscriptionsReady", function() {
     return Result.join([database.readSubscriptions(tx), database.readSubscriptionsHeldUp(tx)]).then(function(_arg) {
-      var args, connection, name, newlyReady, ready, readyFromServer, subscriptions, subscriptionsHeldUp, writes, _i, _j, _len, _len1, _ref1, _ref2;
+      var args, connection, name, newlyReady, serverReady, status, subscriptions, subscriptionsHeldUp, _i, _len, _ref1;
 
       subscriptions = _arg[0], subscriptionsHeldUp = _arg[1];
       newlyReady = [];
       for (_i = 0, _len = subscriptions.length; _i < _len; _i++) {
-        _ref1 = subscriptions[_i], connection = _ref1.connection, name = _ref1.name, args = _ref1.args, readyFromServer = _ref1.readyFromServer, ready = _ref1.ready;
-        if (!ready && readyFromServer && !contains(subscriptionsHeldUp, {
+        _ref1 = subscriptions[_i], connection = _ref1.connection, name = _ref1.name, args = _ref1.args, serverReady = _ref1.serverReady, status = _ref1.status;
+        if (serverReady && status === 'subscribing' && !contains(subscriptionsHeldUp, {
           connection: connection,
           name: name,
           args: args
@@ -13454,52 +13618,19 @@ updateSubscriptionsReadyInTx = function(tx) {
           });
         }
       }
-      if (newlyReady.length === 0) {
-        return false;
-      }
-      writes = [];
-      for (_j = 0, _len1 = newlyReady.length; _j < _len1; _j++) {
-        _ref2 = newlyReady[_j], connection = _ref2.connection, name = _ref2.name, args = _ref2.args;
-        writes.push(database.setSubscriptionReady(tx, connection, name, args));
-        writes.push(database.addUpdate(tx, {
-          update: 'subscriptionReady',
-          subscription: {
-            connection: connection,
-            name: name,
-            args: args
-          }
-        }));
-      }
-      return Result.join(writes);
-    }).then(function() {
-      return true;
+      return Result.map(newlyReady, (function(_arg1) {
+        var args, connection, name;
+
+        connection = _arg1.connection, name = _arg1.name, args = _arg1.args;
+        return database.setSubscriptionReady(tx, connection, name, args).then(function() {
+          return broadcastSubscriptionStatus(tx, trackUpdate, connection, name, args);
+        });
+      }));
     });
   });
 };
 
-Offline._test.updateSubscriptionsReadyInTx = updateSubscriptionsReadyInTx;
-
-updateSubscriptionsReady = function() {
-  return withContext("updateSubscriptionsReady", function() {
-    return database.transaction(function(tx) {
-      return updateSubscriptionsReadyInTx(tx);
-    }).then(function(someNewlyReady) {
-      if (someNewlyReady) {
-        broadcastUpdate();
-      }
-    });
-  });
-};
-
-addNewSubscriptionToDatabase = function(tx, connection, name, args) {
-  return withContext("addNewSubscriptionToDatabase", function() {
-    return database.readMethodsWithDocsWritten(tx, connection).then(function(methodIds) {
-      return database.addSubscriptionWaitingOnMethods(tx, connection, name, args, methodIds);
-    }).then(function() {
-      return database.ensureSubscription(tx, connection, name, args);
-    });
-  });
-};
+Offline._test.updateSubscriptionsReady = updateSubscriptionsReady;
 
 justNameAndArgs = function(subscription) {
   return {
@@ -13603,8 +13734,10 @@ ConnectionAgent = (function() {
 
     this.instantiateCollectionAgents(_.keys(this.meteorConnection._updatesForUnknownStores));
     return asAgentWindow(function(tx) {
-      return database.setSubscriptionReadyFromServer(tx, _this.connectionName, subscription.name, subscription.args).then(function() {
-        return updateSubscriptionsReadyInTx(tx);
+      return database.setSubscriptionServerReady(tx, _this.connectionName, subscription.name, subscription.args).then(function() {
+        return broadcastSubscriptionStatus(tx, null, _this.connectionName, subscription.name, subscription.args);
+      }).then(function() {
+        return updateSubscriptionsReady(tx, null);
       }).then(function() {
         ++_this._nMeteorSubscriptionsReady;
         return _this.checkIfReadyToDeleteDocs(tx);
@@ -13626,30 +13759,6 @@ ConnectionAgent = (function() {
     }));
   };
 
-  ConnectionAgent.prototype.stopOldSubscriptions = function(subscriptions) {
-    var serialized, subscription, _i, _len, _ref1;
-
-    _ref1 = this.oldSubscriptions(subscriptions);
-    for (_i = 0, _len = _ref1.length; _i < _len; _i++) {
-      subscription = _ref1[_i];
-      serialized = canonicalStringify(subscription);
-      this.meteorSubscriptionHandles[serialized].stop();
-      delete this.meteorSubscriptionHandles[serialized];
-    }
-  };
-
-  ConnectionAgent.prototype.startNewSubscription = function(subscription) {
-    var args, handle, name,
-      _this = this;
-
-    this._deletedRemovedDocs = false;
-    name = subscription.name, args = subscription.args;
-    handle = Meteor.subscribe.apply(Meteor, [name].concat(__slice.call(args), [function() {
-      _this.meteorSubscriptionReady(subscription);
-    }]));
-    this.meteorSubscriptionHandles[canonicalStringify(subscription)] = handle;
-  };
-
   ConnectionAgent.prototype.newSubscriptions = function(subscriptions) {
     var _this = this;
 
@@ -13658,20 +13767,78 @@ ConnectionAgent = (function() {
     });
   };
 
-  ConnectionAgent.prototype.startNewSubscriptions = function(subscriptions) {
-    var subscription, _i, _len, _ref1;
+  ConnectionAgent.prototype.stopOldSubscriptions = function(tx, trackUpdate, subscriptions) {
+    var serialized, subscription, writes, _i, _len, _ref1;
 
-    _ref1 = this.newSubscriptions(subscriptions);
+    writes = [];
+    _ref1 = this.oldSubscriptions(subscriptions);
     for (_i = 0, _len = _ref1.length; _i < _len; _i++) {
       subscription = _ref1[_i];
-      this.startNewSubscription(subscription);
+      serialized = canonicalStringify(subscription);
+      this.meteorSubscriptionHandles[serialized].stop();
+      delete this.meteorSubscriptionHandles[serialized];
+      trackUpdate.madeUpdate = true;
+      writes.push(database.addUpdate(tx, {
+        update: 'subscriptionStatus',
+        subscription: {
+          connection: this.connectionName,
+          name: subscription.name,
+          args: subscription.args
+        },
+        status: {
+          status: 'unsubscribed',
+          loaded: false
+        }
+      }));
     }
+    return Result.join(writes);
   };
 
-  ConnectionAgent.prototype.updateSubscriptions = function(subscriptions) {
+  ConnectionAgent.prototype.subscriptionError = function(subscription, error) {
+    var _this = this;
+
+    database.transaction(function(tx) {
+      return database.setSubscriptionError(tx, _this.connectionName, subscription.name, subscription.args, error).then(function() {
+        return broadcastSubscriptionStatus(tx, null, _this.connectionName, subscription.name, subscription.args);
+      });
+    }).then(function() {
+      return broadcastUpdate();
+    });
+  };
+
+  ConnectionAgent.prototype.startNewSubscription = function(subscription) {
+    var args, handle, name,
+      _this = this;
+
+    this._deletedRemovedDocs = false;
+    name = subscription.name, args = subscription.args;
+    handle = Meteor.subscribe.apply(Meteor, [name].concat(__slice.call(args), [{
+      onError: function(err) {
+        _this.subscriptionError(subscription, err);
+      },
+      onReady: function() {
+        _this.meteorSubscriptionReady(subscription);
+      }
+    }]));
+    this.meteorSubscriptionHandles[canonicalStringify(subscription)] = handle;
+  };
+
+  ConnectionAgent.prototype.startNewSubscriptions = function(tx, trackUpdate, subscriptions) {
+    var _this = this;
+
+    return Result.map(this.newSubscriptions(subscriptions), (function(subscription) {
+      _this.startNewSubscription(subscription);
+      return database.ensureSubscription(tx, _this.connectionName, subscription.name, subscription.args).then(function() {
+        return database.setSubscriptionStatus(tx, _this.connectionName, subscription.name, subscription.args, 'subscribing');
+      }).then(function() {
+        return broadcastSubscriptionStatus(tx, trackUpdate, _this.connectionName, subscription.name, subscription.args);
+      });
+    }));
+  };
+
+  ConnectionAgent.prototype.subscribeToSubscriptions = function(tx, trackUpdate, subscriptions) {
     subscriptions = _.map(subscriptions, justNameAndArgs);
-    this.stopOldSubscriptions(subscriptions);
-    this.startNewSubscriptions(subscriptions);
+    return Result.join([this.stopOldSubscriptions(tx, trackUpdate, subscriptions), this.startNewSubscriptions(tx, trackUpdate, subscriptions)]);
   };
 
   ConnectionAgent.prototype.checkIfDocumentNowFree = function(tx, collectionName, docId) {
@@ -13701,7 +13868,7 @@ ConnectionAgent = (function() {
       }).then(function() {
         return database.removeMethodHoldingUpSubscriptions(tx, methodId);
       }).then(function() {
-        return updateSubscriptionsReadyInTx(tx);
+        return updateSubscriptionsReady(tx, null);
       });
     }).then(function() {
       return broadcastUpdate();
@@ -13738,33 +13905,44 @@ connectionAgentFor = function(connectionName) {
   return connectionAgents[connectionName] || (connectionAgents[connectionName] = newConnectionAgent(connectionName));
 };
 
-sendQueuedMethods = function() {
-  return asAgentWindow(function(tx) {
-    return database.readQueuedMethods(tx).then(function(methods) {
-      var args, connection, methodId, name, _i, _len, _ref1;
+sendQueuedMethodsInTx = function(tx) {
+  return database.readQueuedMethods(tx).then(function(methods) {
+    var args, connection, methodId, name, _i, _len, _ref1;
 
-      for (_i = 0, _len = methods.length; _i < _len; _i++) {
-        _ref1 = methods[_i], connection = _ref1.connection, methodId = _ref1.methodId, name = _ref1.name, args = _ref1.args;
-        connectionAgentFor(connection).sendQueuedMethod(methodId, name, args);
-      }
-    });
+    for (_i = 0, _len = methods.length; _i < _len; _i++) {
+      _ref1 = methods[_i], connection = _ref1.connection, methodId = _ref1.methodId, name = _ref1.name, args = _ref1.args;
+      connectionAgentFor(connection).sendQueuedMethod(methodId, name, args);
+    }
   });
 };
 
-subscribeToNewSubscriptions = function(subscriptions) {
-  var connectionAgent, connectionName, connectionSubscriptions, subscription, _i, _len;
+sendQueuedMethods = function() {
+  return asAgentWindow(function(tx) {
+    return sendQueuedMethodsInTx(tx);
+  });
+};
 
-  for (_i = 0, _len = subscriptions.length; _i < _len; _i++) {
-    subscription = subscriptions[_i];
-    connectionAgentFor(subscription.connection);
-  }
-  for (connectionName in connectionAgents) {
-    connectionAgent = connectionAgents[connectionName];
-    connectionSubscriptions = _.filter(subscriptions, function(subscription) {
-      return subscription.connection === connectionName;
+subscribeToSubscriptions = function(tx, trackUpdate) {
+  return database.readMergedSubscriptions(tx).then(function(subscriptions) {
+    var connectionAgent, connectionName, subscription, writes, _i, _len;
+
+    for (_i = 0, _len = subscriptions.length; _i < _len; _i++) {
+      subscription = subscriptions[_i];
+      connectionAgentFor(subscription.connection);
+    }
+    writes = [];
+    for (connectionName in connectionAgents) {
+      connectionAgent = connectionAgents[connectionName];
+      writes.push(connectionAgent.subscribeToSubscriptions(tx, trackUpdate, _.filter(subscriptions, function(subscription) {
+        return subscription.connection === connectionName;
+      })));
+    }
+    Result.join(writes).then(function() {
+      if (trackUpdate.madeUpdate) {
+        broadcastUpdate();
+      }
     });
-    connectionAgent.updateSubscriptions(connectionSubscriptions);
-  }
+  });
 };
 
 CollectionAgent = (function() {
@@ -13872,39 +14050,80 @@ CollectionAgent = (function() {
 
 })();
 
-updateSubscriptions = function() {
-  updateSubscriptionsReady();
-  return subscriptionsUpdated();
+withUpdateTracking = function(fn) {
+  var trackUpdate;
+
+  trackUpdate = {
+    madeUpdate: false
+  };
+  return database.transaction(function(tx) {
+    return fn(tx, trackUpdate);
+  }).then(function() {
+    if (trackUpdate.madeUpdate) {
+      broadcastUpdate();
+    }
+  });
 };
 
-subscriptionsUpdated = function() {
-  asAgentWindow(function(tx) {
-    return database.readMergedSubscriptions(tx);
-  }).then(function(subscriptions) {
-    return subscribeToNewSubscriptions(subscriptions);
+windowSubscriptionsUpdated = function() {
+  withUpdateTracking(function(tx, trackUpdate) {
+    return subscribeToSubscriptions(tx, trackUpdate);
   });
 };
 
 initialized = new Result();
 
+cleanSubscriptions = function(tx, trackUpdate) {
+  return database.cleanSubscriptions(tx).then(function(deletedSubscriptions) {
+    return Result.map(deletedSubscriptions, (function(subscription) {
+      trackUpdate.madeUpdate = true;
+      return database.addUpdate(tx, {
+        update: 'subscriptionStatus',
+        subscription: subscription,
+        status: {
+          status: 'unsubscribed',
+          loaded: false
+        }
+      });
+    }));
+  });
+};
+
 initializeAgent = function() {
-  return sendQueuedMethods().then(function() {
+  withUpdateTracking(function(tx, trackUpdate) {
+    return cleanSubscriptions(tx, trackUpdate).then(function() {
+      return database.initializeSubscriptions(tx);
+    }).then(function() {
+      return database.readSubscriptions(tx);
+    }).then(function(subscriptions) {
+      return Result.map(subscriptions, (function(subscription) {
+        return broadcastStatusOfSubscription(tx, trackUpdate, subscription);
+      }));
+    }).then(function() {
+      return sendQueuedMethodsInTx(tx);
+    });
+  }).then(function() {
     return initialized.complete();
   });
 };
 
 windowsAreDead.listen(function(deadWindowIds) {
   initialized.then(function() {
+    var trackUpdate;
+
+    trackUpdate = {
+      madeUpdate: false
+    };
     asAgentWindow(function(tx) {
       return database.deleteWindows(tx, deadWindowIds).then(function() {
-        return database.cleanSubscriptions(tx);
+        return cleanSubscriptions(tx, trackUpdate);
       }).then(function() {
-        return database.readMergedSubscriptions(tx);
-      }).then(function(subscriptions) {
-        return subscribeToNewSubscriptions(subscriptions);
-      }).then(function() {
-        return updateSubscriptionsReadyInTx(tx);
+        return subscribeToSubscriptions(tx, trackUpdate);
       });
+    }).then(function() {
+      if (trackUpdate.madeUpdate) {
+        return broadcastUpdate();
+      }
     });
   });
 });
@@ -13913,8 +14132,8 @@ Meteor.startup(function() {
   if ((this.Agent == null) && Offline._usingSharedWebWorker) {
     return;
   }
-  addMessageHandler('subscriptionsUpdated', function() {
-    updateSubscriptions();
+  addMessageHandler('windowSubscriptionsUpdated', function() {
+    windowSubscriptionsUpdated();
   });
   addMessageHandler('newQueuedMethod', function() {
     sendQueuedMethods();

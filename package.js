@@ -5,6 +5,7 @@ Package.describe({
 Package.on_use(function (api) {
   api.use('coffeescript', ['client', 'server']);
   api.use('offline-common', ['client', 'server']);
+  api.use('isolate-value', 'client');
 
   // As a hack, name these files with '.javascript' so that they
   // get added as static files instead of bundled with the JavaScript
@@ -16,6 +17,7 @@ Package.on_use(function (api) {
 
   api.add_files('worker-server.litcoffee', 'server');
   api.add_files('worker-client.litcoffee', 'client');
+  api.add_files('variable.litcoffee', 'client');
   api.add_files('proxy.litcoffee', 'client');
   api.add_files('server.litcoffee', 'server');
 });

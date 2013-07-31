@@ -7,14 +7,15 @@
 
   "author": "Andrew Wilcox",
 
-  "version": "0.0.5",
+  "version": "0.1.0rc1",
 
   "git": "https://github.com/awwx/meteor-offline-data.git",
 
   "packages": {
     "offline-common": {
       "git": "https://github.com/awwx/meteor-offline-common.git",
-      "tag": "v0.0.5"
+      "tag": "v0.1.0rc1"
     }
+    "isolate-value": "2.0.0"
   }
 }

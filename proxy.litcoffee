@@ -1,3 +1,5 @@
+    return unless Offline.supported
+
     {contains, Result} = awwx
     broadcast = Offline._broadcast
     {defer} = awwx.Error
@@ -20,36 +22,32 @@
         return
 
 
-An offline subscription is ready when:
 
-* the underlying Meteor subscription is ready
+Subscription status: connecting, ready, error, stopped
 
-* server documents have been stored in the database
 
-* database documents have been copied to the local collection
+    subscriptionStatus = {}
 
-    subscriptionReadyDeps = {}
-    subscriptionReady = {}
 
-    getSubscriptionReady = (subscription) ->
-      serialized = canonicalStringify(subscription)
-      dep = (subscriptionReadyDeps[serialized] or= new Deps.Dependency)
-      dep.depend()
-      unless subscriptionReady[serialized]?
-        subscriptionReady[serialized] = false
-      return subscriptionReady[serialized]
+    subscriptionStatusVariable = (subscription) ->
+      subscriptionStatus[canonicalStringify(subscription)] or=
+        Variable({
+          status: 'unsubscribed'
+          loaded: false
+        })
 
-    setSubscriptionReady = (serializedSubscription, ready) ->
-      dep = (subscriptionReadyDeps[serializedSubscription] or= new Deps.Dependency)
-      if subscriptionReady[serializedSubscription] isnt ready
-        subscriptionReady[serializedSubscription] = ready
-        dep.changed()
-      return
+
+    getSubscriptionStatus = (subscription) ->
+      subscriptionStatusVariable(subscription)()
+
+
+    setSubscriptionStatus = (subscription, status) ->
+      subscriptionStatusVariable(subscription).set(status)
 
 
     addWindowSubscription = (connection, name, args) ->
       database.transaction((tx) ->
-        database.addSubscriptionForWindow(
+        database.addWindowSubscription(
           tx,
           thisWindowId,
           connection,
@@ -58,7 +56,7 @@ An offline subscription is ready when:
         )
       )
       .then(->
-        messageAgent 'subscriptionsUpdated'
+        messageAgent 'windowSubscriptionsUpdated'
       )
 
 
@@ -98,6 +96,7 @@ connection name -> OfflineConnection
             )
             return
 
+
       _addCollection: (offlineCollection) ->
         name = offlineCollection._collectionName
         if @_offlineCollections[name]?
@@ -105,11 +104,14 @@ connection name -> OfflineConnection
         @_offlineCollections[name] = offlineCollection
         return
 
+
       registerStore: (name, wrappedStore) ->
         return wrappedStore
 
+
       userId: ->
         return null
+
 
 TODO is setUserId defined on the client?
 
@@ -117,74 +119,36 @@ TODO is setUserId defined on the client?
         throw new Error('not implemented yet')
 
 
-Add to this window's list of offline subscriptions.
+      subscriptions: (subscriptions) ->
+        unless _.isArray(subscriptions)
+          throw new Error('`subscriptions` argument should be an array')
+        for subscription in subscriptions
+          unless _.isArray(subscription)
+            throw new Error('each individual subscription should be an array')
+          unless subscription.length > 0
+            throw new Error('a subscription should include at least the subscription name')
+          unless _.isString(subscription[0])
+            throw new Error('the subscription name should be a string')
 
-"ready" means we've finished loading saved data from the browser
-database, or, if this is a first subscription and we don't have data in
-the database yet, that we've finished loaded data from the server (the
-underlying server subscription is ready).
-
-TODO support `onError` (will need to store error in database)
-
-      subscribe: (name, args...) ->
-
-        last = _.last(args)
-        if _.isFunction(last)
-          args = _.initial(args)
-          onReady = last
-          onError = (->)
-        else if last? and (_.isFunction(last.onReady) or _.isFunction(last.onError))
-          args = _.initial(args)
-          onReady = last.onReady ? (->)
-          onError = last.onError ? (->)
-        else
-          onReady = (->)
-          onError = (->)
-
-        if Deps.active
-          throw new Error(
-            'reactive offline subscriptions are not yet implemented'
+        database.transaction((tx) =>
+          database.setWindowSubscriptions(
+            tx,
+            thisWindowId,
+            @connectionName,
+            subscriptions
           )
+        )
+        .then(->
+          messageAgent 'windowSubscriptionsUpdated'
+        )
 
-        addWindowSubscription @connectionName, name, args
 
-        stopped = false
+      subscriptionStatus: (name, args...) ->
+        getSubscriptionStatus({connection: @connectionName, name, args})
 
-        handle = {
-          ready: =>
-            if stopped
-              return false
-            else
-              return getSubscriptionReady({connection: @connectionName, name, args})
 
-          stop: =>
-            return if stopped
-            stopped = true
-            database.transaction((tx) =>
-              database.removeWindowSubscription(
-                tx,
-                thisWindowId,
-                @connectionName,
-                name,
-                args
-              )
-              .then(=>
-                database.cleanSubscriptions(tx)
-              )
-            ).then(->
-              messageAgent 'subscriptionsUpdated'
-            )
-            return
-        }
-
-        computation = Deps.autorun ->
-          if handle.ready()
-            onReady()
-            computation.stop() if computation
-            computation = null
-          return
-
-        return handle
+      subscriptionLoaded: (name, args...) ->
+        isolateValue(=> @subscriptionStatus(name, args...).loaded)
 
 
 https://github.com/meteor/meteor/blob/release/0.6.1/packages/livedata/livedata_connection.js#L525
@@ -324,6 +288,18 @@ https://github.com/meteor/meteor/blob/release/0.6.1/packages/livedata/livedata_c
       defaultOfflineConnection.subscribe(name, args...)
 
 
+    Offline.subscriptions = (subscriptions) ->
+      defaultOfflineConnection.subscriptions(subscriptions)
+
+
+    Offline.subscriptionStatus = (name, args...) ->
+      defaultOfflineConnection.subscriptionStatus(name, args...)
+
+
+    Offline.subscriptionLoaded = (name, args...) ->
+      defaultOfflineConnection.subscriptionLoaded(name, args...)
+
+
 connectionName -> collectionName -> LocalCollection
 
     Offline._localCollections = localCollections = {}
@@ -438,17 +414,22 @@ All windows listen for updates from the agent window.
       updateLocal connectionName, collectionName, docId, doc
       return
 
-    processSubscriptionReady = (update) ->
+    processSubscriptionError = (update) ->
       {subscription} = update
-      setSubscriptionReady canonicalStringify(subscription), true
+      setSubscriptionStatus update.subscription, 'error'
       return
 
     processUpdate = (update) ->
       switch update.update
-        when 'documentUpdated'   then processDocumentUpdated(update)
-        when 'subscriptionReady' then processSubscriptionReady(update)
+        when 'documentUpdated'    then processDocumentUpdated(update)
+        when 'subscriptionError'  then processSubscriptionError(update)
+
+        when 'subscriptionStatus'
+          setSubscriptionStatus update.subscription, update.status
+
         else
           throw new Error "unknown update: " + canonicalStringify(update)
+
       return
 
 
@@ -477,8 +458,10 @@ TODO getting called a lot
       )
       .then((subscriptions) ->
         for subscription in subscriptions
-          if subscription.ready
-            setSubscriptionReady canonicalStringify(_.pick(subscription, ['connection', 'name', 'args'])), true
+          setSubscriptionStatus(
+            _.pick(subscription, ['connection', 'name', 'args']),
+            subscription.status
+          )
         return
       )
 

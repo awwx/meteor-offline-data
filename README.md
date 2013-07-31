@@ -25,8 +25,6 @@ See the
 
 Major gaps:
 
-* [slow startup](https://github.com/awwx/meteor-offline-data/issues/4)
-
 * [no support yet for IE and Firefox](https://github.com/awwx/meteor-offline-data/issues/5)
 
 * [no fallback if the browser database isn't available](https://github.com/awwx/meteor-offline-data/issues/6)
@@ -83,31 +81,129 @@ The Meteor "todos" example,
 [modified to use offline-data](https://github.com/awwx/meteor-offline-todos#readme).
 
 
+## Offline Subscriptions
+
+In standard Meteor, subscriptions are dynamic: you start a
+subscription with `Meteor.subscribe`, and you can later stop the
+subscription by calling `stop` on the subscription handle.  Each call
+to `Meteor.subscribe` creates a new subscription, and it can only last
+for as long as the window is loaded.
+
+In offline data, subscriptions are shared across browser windows, and
+persist across reloads.  A window declares the subscriptions it wants
+the agent to subscribe to, but there isn't a one-to-one correspondence
+between the window's declared subscriptions and the agent's Meteor
+subscriptions.  If the window requests a subscription that is already
+being subscribed to, the existing subscription is reused instead of
+starting a new subscription.  And the agent's Meteor subscription may
+need to be restarted if the agent window changes or the application is
+reloaded.
+
+Another difference is that *not* subscribing to a subscription
+actively causes the documents unique to that subscription to be
+deleted.  This is because the only way to tell that document persisted
+in the browser was deleted while the client was offline is to wait for
+subscriptions to become ready, and to see what documents we got from
+the server.  (Any documents we *didn't* receive can and should now be
+deleted on the client, since we now know they were deleted on the
+server while we were offline).
+
+Thus we don't want to subscribe for example to "lists" and then later
+subscribe to "tasks"... we could end up deleting all our task
+documents and then reloading them.  Instead we want to subscribe to "lists" and "tasks" together,
+
+
 ## Offline API
 
-**Offline.subscribe(name [, arg1, arg2, ... ] [, callbacks])**
+**Offline.supported**
 *client*
 
-In standard Meteor, each browser window has its own set of
-collections, independent of the other windows.  A change to a
-collection in one window will be reactively shared with other windows
-by making a round trip through the server; but when offline, one
-window will not see a change made by another window.
+This constant is `true` if offline data is supported in this browser
+(for example, the browser supports the Web SQL Database) and `false`
+if it isn't.
 
-In constrast offline collections are shared across browser windows, so
-that a change in one window is seen in another window -- even when
-offline.  This means that subscriptions are also shared: making a
-subscription in one window will cause documents delivered for that
-subscription to be seen by all windows.
+Other methods in the API aren't defined if offline data isn't
+supported.
 
-An application that was relying on filtering subscriptions on the
-server ("send me the items for the selected project") may need to
-re-apply the filter on the client when using an offline collections
-(two different windows could each have a subscription to a different
-project, and then with an offline collection both windows will see
-items for both projects).  However an application designed to be used
-offline may want to filter less on the server anyway, so that more
-data is persisted locally for offline use.
+
+**Offline.subscriptions([
+<br> &nbsp; [name, arg1, arg2, ... ]
+<br> &nbsp; [name, arg1, arg2, ... ]
+<br> &nbsp; ...
+<br>])
+*client*
+
+Specifies the set of subscriptions to subscribe to.  Any subscriptions
+not listed in any window's subscription set are unsubscribed.
+
+Thus calling `subscriptions` *replaces* the set of subscriptions
+subscribed to, instead of adding to them.
+
+In standard Meteor a common pattern is to *select* a set of documents
+to retrieve from the server and display:
+
+```
+Meteor.subscribe("projects");
+Deps.autorun(function () {
+  Meteor.subscribe("tasks", Session.get("currentProjectId"));
+});
+
+With offline data it is common to subscribe to a larger set of
+documents that we want to have *available* while offline,
+
+```
+Offline.subscriptions([["projects"], ["tasks"]]);
+```
+
+and then display a particular subset:
+
+```
+Tasks.find({projectId: Session.get("currentProjectId")})
+```
+
+
+<br>
+**Offline.subscriptionLoaded(name, [, arg1, arg2, ...])
+*client*
+
+Returns `true` or `false` indicating whether the documents for a
+subscription have been loaded.  A reactive data source.
+
+For a new subscription, the subscription is "loaded" when it becomes
+ready.  However the "loaded" status persists across reloads of the
+application, and so a loaded subscription will still show as loaded
+even if the application starts up offline.
+
+A subscription will transition to not being loaded if it is
+unsubscribed, or if the offline agent's Meteor subscription reports an
+error (through the Meteor.subscribe onError callback).
+
+
+<br>
+**Offline.subscriptionStatus(name, [, arg1, arg2, ...])
+*client*
+
+Returns an object describing the dynamic status of the Meteor
+subscription made by the offline agent.  A reactive data source.
+
+The object will contain a `status` field which
+can be one of the strings `unsubscribed`, `subscribing`, `error`, or
+`ready`.  When the status is "error" the object will also contain an
+`error` field with the subscription error.
+
+(The subscription error will be an object containing the same fields
+as the
+[`Meteor.Error`](http://docs.meteor.com/#meteor_error)
+object returned for the Meteor subscription, but will not be an
+instance of the `Meteor.Error` class because of EJSON serialization).
+
+It's normal for the status to transition from `ready` back to
+`subscribing` if the agent window changes.
+
+If a subscription is loaded but not ready, that means the client has a
+complete set of old documents (from the last time we were online and
+got synced up), but hasn't received the latest updates from the server
+yet.
 
 
 <br>
