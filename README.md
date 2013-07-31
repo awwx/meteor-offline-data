@@ -21,7 +21,7 @@ See the
 
 ## Version
 
-0.0.5 early alpha release.
+0.1.0 (alpha)
 
 Major gaps:
 
