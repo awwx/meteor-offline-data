@@ -21,7 +21,13 @@ See the
 
 ## Version
 
-0.1.0 (alpha)
+0.1.1 (alpha)
+
+Version 0.1.1 should be used with Meteor 0.6.5 only.  (Offline data is
+closely tied to Meteor's internal livedata implementation, and the
+shared web worker loads Meteor 0.6.5 code modified to run in the web
+worker environment, so new releases of Meteor require a new release of
+offline data).
 
 Major gaps:
 
