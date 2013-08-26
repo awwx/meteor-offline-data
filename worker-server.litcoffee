@@ -1,14 +1,25 @@
-    connect = Npm.require 'connect'
-    bundle = __meteor_bootstrap__.bundle
+    files = [
+      'worker-boot.javascript'
+      'worker-packages.javascript'
+    ]
 
-    connect.static.mime.define 'application/javascript': ['javascript']
 
-    hashFor = (path) ->
-      _.find(bundle.manifest, (entry) -> entry.path is path)?.hash
+Map filename to the file's url in the appcache manifest (which
+includes the "cache busting" hash as the url's query parameter).
 
-    __meteor_runtime_config__.offlineDataWorker = {
-      hashes: {
-        boot: hashFor('static/packages/offline-data/worker-boot.javascript')
-        packages: hashFor('static/packages/offline-data/worker-packages.javascript')
-      }
-    }
+    urls = {}
+
+    for file in files
+      entry = _.find(
+        WebApp.clientProgram.manifest,
+        (entry) -> entry.url is "/packages/offline-data/#{file}"
+      )
+      unless entry?
+        throw new Error("#{file} not found in WebApp.clientProgram.manifest")
+      urls[file] = entry.url + "?" + entry.hash
+
+
+Save in the runtime config delivered to the client, so the client
+can look up the url to use.
+
+    __meteor_runtime_config__.offlineDataWorker = {urls}

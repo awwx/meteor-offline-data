@@ -1,6 +1,3 @@
-    @Offline or= {}
-
-
 TODO not supporting unit tests with shared web worker yet.
 
     if (not @SharedWorker? or
@@ -16,10 +13,8 @@ TODO not supporting unit tests with shared web worker yet.
 Reference the boot script with the same "cache busting" URL that the
 appcache generates for the app manifest.
 
-    worker = new SharedWorker(
-      '/packages/offline-data/worker-boot.javascript?' +
-      __meteor_runtime_config__.offlineDataWorker.hashes.boot
-    )
+    url = __meteor_runtime_config__.offlineDataWorker.urls['worker-boot.javascript']
+    worker = new SharedWorker(url)
 
 
     messageHandlers = {}

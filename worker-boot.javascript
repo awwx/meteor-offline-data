@@ -1,22 +1,21 @@
-// This is the first code run inside the shared web worker
-// environment.
+// This code is run first in the shared web worker environment.
 
 (function () {
 
   var global = self;
 
 
-  var Agent = {};
-  global.Agent = Agent;
+  var WebWorker = {};
+  global.WebWorker = WebWorker;
 
   // List of ports from browser windows connecting to us.
 
-  Agent.ports = [];
+  WebWorker.ports = [];
 
   // List of the windowId of each window connecting to us, in the same
   // order as the ports list.
 
-  Agent.windowIds = [];
+  WebWorker.windowIds = [];
 
   // There's no console log in the shared web worker environment, so
   // we'll have Meteor._debug call the log function here.
@@ -27,20 +26,20 @@
   // the browser debugger if startup errors prevent getting to the
   // point of listening to window connections.
 
-  Agent.logs = [];
+  WebWorker.logs = [];
 
 
   // Log a debug message.  Pass on to connected windows if we have any
   // yet, otherwise store in `logs` until we have a connection.
 
-  Agent.log = function (msg) {
-    if (Agent.ports.length > 0) {
-      for (var i = 0;  i < Agent.ports.length;  ++i) {
-        Agent.ports[i].postMessage({msg: 'log', log: [msg]});
+  WebWorker.log = function (msg) {
+    if (WebWorker.ports.length > 0) {
+      for (var i = 0;  i < WebWorker.ports.length;  ++i) {
+        WebWorker.ports[i].postMessage({msg: 'log', log: [msg]});
       }
     }
     else {
-      Agent.logs.push(msg);
+      WebWorker.logs.push(msg);
     }
   };
 
@@ -49,7 +48,7 @@
   // https://developer.mozilla.org/en-US/docs/Web/API/window.onerror
 
   global.onerror = function(errorMessage, url, lineNumber) {
-    Agent.log("error: " + errorMessage + " " + url + ":" + lineNumber);
+    WebWorker.log("error: " + errorMessage + " " + url + ":" + lineNumber);
   };
 
 
@@ -71,7 +70,7 @@
   var messageHandlers = {};
 
 
-  Agent.addMessageHandler = function (msg, callback) {
+  WebWorker.addMessageHandler = function (msg, callback) {
     messageHandlers[msg] = callback;
   };
 
@@ -83,10 +82,10 @@
 
   var booted = false;
 
-  Agent.addMessageHandler('boot', function (port, data) {
-    var i = Agent.ports.indexOf(port);
+  WebWorker.addMessageHandler('boot', function (port, data) {
+    var i = WebWorker.ports.indexOf(port);
     if (i !== -1)
-      Agent.windowIds[i] = data.windowId;
+      WebWorker.windowIds[i] = data.windowId;
 
     if (booted)
       return;
@@ -100,14 +99,11 @@
     // the syntax error).
 
     importScripts(
-      '/packages/offline-data/worker-packages.javascript?' +
-      __meteor_runtime_config__.offlineDataWorker.hashes.packages
+      __meteor_runtime_config__.offlineDataWorker.urls['worker-packages.javascript']
     );
     booted = true;
 
-    // start() is defined in the startup package, and it runs
-    // the Meteor.startup callbacks.
-    Agent.start();
+    Package.meteor.Meteor._start();
   });
 
 
@@ -116,8 +112,8 @@
   var onmessage = function (port, event) {
     var data = event.data;
 
-    if (Agent.ports.indexOf(port) === -1) {
-      Agent.log(
+    if (WebWorker.ports.indexOf(port) === -1) {
+      WebWorker.log(
         'Message ' + data.msg + ' received from "dead" window: ' +
         data.windowId
       );
@@ -130,7 +126,7 @@
       handler(port, data);
     }
     else {
-      Agent.log("Error: Unknown message type: " + data.msg);
+      WebWorker.log("Error: Unknown message type: " + data.msg);
     }
   };
 
@@ -138,16 +134,16 @@
   global.onconnect = function (event) {
     var port = event.ports[0];
 
-    if (Agent.logs.length > 0) {
-      port.postMessage({log: Agent.logs});
-      Agent.logs = [];
+    if (WebWorker.logs.length > 0) {
+      port.postMessage({log: WebWorker.logs});
+      WebWorker.logs = [];
     }
 
     port.onmessage = function (event) {
       onmessage(port, event);
     };
 
-    Agent.ports.push(port);
+    WebWorker.ports.push(port);
   };
 
   // Weirdly, shared web workers have no way of detecting when the
@@ -155,11 +151,11 @@
   // do by pinging windows to see if they're still alive, and
   // `windowIsDead` here gets called when we don't get a response.
 
-  Agent.windowIsDead = function (windowId) {
-    var i = Agent.windowIds.indexOf(windowId);
+  WebWorker.windowIsDead = function (windowId) {
+    var i = WebWorker.windowIds.indexOf(windowId);
     if (i !== -1) {
-      Agent.ports.splice(i, 1);
-      Agent.windowIds.splice(i, 1);
+      WebWorker.ports.splice(i, 1);
+      WebWorker.windowIds.splice(i, 1);
     }
   };
 

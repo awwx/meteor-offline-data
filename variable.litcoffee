@@ -1,4 +1,4 @@
-    @Variable = (initialValue) ->
+    Variable = (initialValue) ->
 
       value = initialValue
       dep = new Deps.Dependency()

@@ -10,7 +10,5 @@ algorithm).
 For convenience on the server, Offline.methods etc. delegate to their
 Meteor counterpart.
 
-      @Offline or= {}
-
       Offline.methods = (methods) ->
         Meteor.methods methods

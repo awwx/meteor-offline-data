@@ -1,11 +1,7 @@
     return unless Offline.supported
 
-    {contains, Result} = awwx
-    broadcast = Offline._broadcast
-    {defer} = awwx.Error
     database = Offline._database
     {thisWindowId} = Offline._windows
-    {withContext} = awwx.Context
     messageAgent = Offline._messageAgent
 
 
@@ -30,7 +26,7 @@ Subscription status: connecting, ready, error, stopped
 
 
     subscriptionStatusVariable = (subscription) ->
-      subscriptionStatus[canonicalStringify(subscription)] or=
+      subscriptionStatus[stringify(subscription)] or=
         Variable({
           status: 'unsubscribed'
           loaded: false
@@ -60,6 +56,22 @@ Subscription status: connecting, ready, error, stopped
       )
 
 
+https://github.com/meteor/meteor/blob/release/0.6.5/packages/livedata/livedata_common.js#L7
+
+TODO sessionData (need an example of how it's used)
+
+TODO can unblock get called in the client?  is it treated as a no-op?
+
+    class MethodInvocation
+
+      constructor: (options) ->
+        @isSimulation = options.isSimulation
+        @userId = options.userId
+
+      setUserId: (userId) ->
+        throw new Error("accounts are not yet supported for offline data")
+
+
 connection name -> OfflineConnection
 
     offlineConnections = {}
@@ -80,7 +92,7 @@ connection name -> OfflineConnection
 
 
       _initialize: ->
-        withContext "initialize offline connection #{@connectionName}", =>
+        Context.withContext "initialize offline connection #{@connectionName}", =>
           Meteor.startup =>
             database.transaction((tx) =>
               database.readDocs(tx, @connectionName)
@@ -151,7 +163,7 @@ TODO is setUserId defined on the client?
         isolateValue(=> @subscriptionStatus(name, args...).loaded)
 
 
-https://github.com/meteor/meteor/blob/release/0.6.1/packages/livedata/livedata_connection.js#L525
+https://github.com/meteor/meteor/blob/release/0.6.5/packages/livedata/livedata_connection.js#L561
 
       methods: (methods) ->
         _.each methods, (func, name) =>
@@ -174,7 +186,7 @@ https://github.com/meteor/meteor/blob/release/0.6.1/packages/livedata/livedata_c
         return Result.join(writes)
 
 
-https://github.com/meteor/meteor/blob/release/0.6.1/packages/livedata/livedata_connection.js#L584
+https://github.com/meteor/meteor/blob/release/0.6.5/packages/livedata/livedata_connection.js#L634
 
       _runStub: (methodId, alreadyInSimulation, name, args) ->
         stub = @_methodHandlers[name]
@@ -182,7 +194,7 @@ https://github.com/meteor/meteor/blob/release/0.6.1/packages/livedata/livedata_c
 
         # TODO sessionData
 
-        invocation = new Meteor._MethodInvocation({
+        invocation = new MethodInvocation({
           isSimulation: true
           userId: @userId()
           setUserId: (userId) => @setUserId(userId)
@@ -190,7 +202,7 @@ https://github.com/meteor/meteor/blob/release/0.6.1/packages/livedata/livedata_c
 
         if alreadyInSimulation
           try
-            ret = Meteor._CurrentInvocation.withValue(invocation, ->
+            ret = DDP._CurrentInvocation.withValue(invocation, ->
               return stub.apply(invocation, EJSON.clone(args))
             )
           catch e
@@ -208,7 +220,7 @@ https://github.com/meteor/meteor/blob/release/0.6.1/packages/livedata/livedata_c
           .then(=>
             @_saveOriginals()
             try
-              ret = Meteor._CurrentInvocation.withValue(invocation, ->
+              ret = DDP._CurrentInvocation.withValue(invocation, ->
                 return stub.apply(invocation, EJSON.clone(args))
               )
             catch e
@@ -225,7 +237,7 @@ https://github.com/meteor/meteor/blob/release/0.6.1/packages/livedata/livedata_c
         )
 
 
-https://github.com/meteor/meteor/blob/release/0.6.1/packages/livedata/livedata_connection.js#L534
+https://github.com/meteor/meteor/blob/release/0.6.5/packages/livedata/livedata_connection.js#L570
 
       call: (name, args...) ->
         if args.length and typeof args[args.length - 1] is 'function'
@@ -233,7 +245,7 @@ https://github.com/meteor/meteor/blob/release/0.6.1/packages/livedata/livedata_c
         return @apply(name, args, callback)
 
 
-https://github.com/meteor/meteor/blob/release/0.6.1/packages/livedata/livedata_connection.js#L543
+https://github.com/meteor/meteor/blob/release/0.6.5/packages/livedata/livedata_connection.js#L588
 
       apply: (name, args, options, callback) ->
         if not callback and typeof options is 'function'
@@ -243,11 +255,11 @@ https://github.com/meteor/meteor/blob/release/0.6.1/packages/livedata/livedata_c
         if callback
           callback = Meteor.bindEnvironment callback, (e) ->
             Meteor._debug("Exception while delivering result of invoking '" +
-                          name + "'", e, e.stack)
+                          name + "'", e, e?.stack)
 
         methodId = Random.id()
 
-        enclosing = Meteor._CurrentInvocation.get()
+        enclosing = DDP._CurrentInvocation.get()
         alreadyInSimulation = enclosing and enclosing.isSimulation
 
         @_runStub(methodId, alreadyInSimulation, name, args)
@@ -255,7 +267,7 @@ https://github.com/meteor/meteor/blob/release/0.6.1/packages/livedata/livedata_c
           unless exception.expected
             Meteor._debug(
               "Exception while simulating the effect of invoking '" +
-              name + "'", exception, exception.stack
+              name + "'", exception, exception?.stack
             )
           return
         )
@@ -428,7 +440,7 @@ All windows listen for updates from the agent window.
           setSubscriptionStatus update.subscription, update.status
 
         else
-          throw new Error "unknown update: " + canonicalStringify(update)
+          throw new Error "unknown update: " + stringify(update)
 
       return
 
