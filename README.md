@@ -140,7 +140,7 @@ supported.
 <br> &nbsp; [name, arg1, arg2, ... ]
 <br> &nbsp; [name, arg1, arg2, ... ]
 <br> &nbsp; ...
-<br>])
+<br>])**
 *client*
 
 Specifies the set of subscriptions to subscribe to.  Any subscriptions
@@ -157,6 +157,7 @@ Meteor.subscribe("projects");
 Deps.autorun(function () {
   Meteor.subscribe("tasks", Session.get("currentProjectId"));
 });
+```
 
 With offline data it is common to subscribe to a larger set of
 documents that we want to have *available* while offline,
@@ -173,7 +174,7 @@ Tasks.find({projectId: Session.get("currentProjectId")})
 
 
 <br>
-**Offline.subscriptionLoaded(name, [, arg1, arg2, ...])
+**Offline.subscriptionLoaded(name, [, arg1, arg2, ...])**
 *client*
 
 Returns `true` or `false` indicating whether the documents for a
@@ -190,7 +191,7 @@ error (through the Meteor.subscribe onError callback).
 
 
 <br>
-**Offline.subscriptionStatus(name, [, arg1, arg2, ...])
+**Offline.subscriptionStatus(name, [, arg1, arg2, ...])**
 *client*
 
 Returns an object describing the dynamic status of the Meteor
