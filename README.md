@@ -21,15 +21,19 @@ See the
 
 ## Version
 
-0.1.1 (alpha)
+0.1.1
 
-Version 0.1.1 should be used with Meteor 0.6.5 only.  (Offline data is
-closely tied to Meteor's internal livedata implementation, and the
-shared web worker loads Meteor 0.6.5 code modified to run in the web
-worker environment, so new releases of Meteor require a new release of
-offline data).
+Use 0.1.1 with Meteor 0.6.5 only.
 
-Major gaps:
+(Offline data is closely tied to Meteor's internal livedata
+implementation, and the shared web worker loads Meteor 0.6.5 code
+modified to run in the web worker environment, so new releases of
+Meteor require a new release of offline data).
+
+For Meteor 0.6.4.1, use Offline Data version 0.1.0.
+
+
+Current gaps:
 
 * [no support yet for IE and Firefox](https://github.com/awwx/meteor-offline-data/issues/5)
 
@@ -49,8 +53,8 @@ the [Meteor Offline Data Campaign](http://offline-data.meteor.com/).
 
 ## Offline Data Package
 
-Offline data is a client side smart package which runs on top of
-standard, unmodified Meteor.
+Offline data is a client side package which runs on top of standard,
+unmodified Meteor.
 
 On the server, collections are standard Meteor collections and methods
 are standard Meteor methods: the server doesn't know or care that the
