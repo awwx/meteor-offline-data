@@ -8,6 +8,11 @@
   var WebWorker = {};
   global.WebWorker = WebWorker;
 
+
+  WebWorker.id = (''+Math.random()).substr(2);
+
+
+
   // List of ports from browser windows connecting to us.
 
   WebWorker.ports = [];

@@ -14,7 +14,8 @@ Reference the boot script with the same "cache busting" URL that the
 appcache generates for the app manifest.
 
     url = __meteor_runtime_config__.offlineDataWorker.urls['worker-boot.javascript']
-    worker = new SharedWorker(url)
+    hash = url.substr(url.lastIndexOf('?') + 1)
+    worker = new SharedWorker(url, hash)
 
 
     messageHandlers = {}

@@ -5,15 +5,24 @@
     messageAgent = Offline._messageAgent
 
 
+    debug = Meteor.settings?.public?.offlineData?.debug?.proxy
+
+    log = (args...) ->
+      Meteor._debug "offline-data proxy:", args...
+      return
+
+
     if Offline._usingSharedWebWorker
 
       broadcastUpdate = ->
+        log "broadcast update" if debug
         messageAgent 'update'
         return
 
     else
 
       broadcastUpdate = ->
+        log "broadcast update" if debug
         broadcast 'update'
         return
 
@@ -38,6 +47,7 @@ Subscription status: connecting, ready, error, stopped
 
 
     setSubscriptionStatus = (subscription, status) ->
+      log "set subscription status", stringify(subscription), stringify(status) if debug
       subscriptionStatusVariable(subscription).set(status)
 
 
@@ -426,19 +436,13 @@ All windows listen for updates from the agent window.
       updateLocal connectionName, collectionName, docId, doc
       return
 
-    processSubscriptionError = (update) ->
-      {subscription} = update
-      setSubscriptionStatus update.subscription, 'error'
-      return
-
     processUpdate = (update) ->
+      log "process update", stringify(update) if debug
       switch update.update
-        when 'documentUpdated'    then processDocumentUpdated(update)
-        when 'subscriptionError'  then processSubscriptionError(update)
-
+        when 'documentUpdated'
+          processDocumentUpdated(update)
         when 'subscriptionStatus'
           setSubscriptionStatus update.subscription, update.status
-
         else
           throw new Error "unknown update: " + stringify(update)
 
@@ -469,10 +473,11 @@ TODO getting called a lot
         database.readSubscriptions(tx)
       )
       .then((subscriptions) ->
+        log "startup subscriptions", stringify(subscriptions) if debug
         for subscription in subscriptions
           setSubscriptionStatus(
             _.pick(subscription, ['connection', 'name', 'args']),
-            subscription.status
+            Offline._subscriptionStatus(subscription)
           )
         return
       )
