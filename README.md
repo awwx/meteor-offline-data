@@ -45,8 +45,8 @@ for the full known TODO list.
 
 ## Community Funded
 
-Development of the Offline Data package is funded by contributors to
-the [Meteor Offline Data Campaign](http://offline-data.meteor.com/).
+Development of the Offline Data package is funded by contributors through
+[Gittip](https://www.gittip.com/awwx/).
 
 
 ## Offline Data Package
