@@ -20,7 +20,8 @@ Package.on_use(function (api) {
       'minimongo',
       'isolate-value',
       'canonical-stringify',
-      'variable'
+      'variable',
+      'mongo-livedata'
     ],
     'client'
   );
@@ -32,13 +33,10 @@ Package.on_use(function (api) {
     'server'
   );
 
-  // Name these files with '.javascript' so that they get added as
-  // static files instead of bundled with the JavaScript source code.
-
   api.add_files([
-    'worker-boot.javascript',
-    'worker-packages.javascript'
-  ], 'client');
+    'worker-boot.js',
+    'worker-packages.js'
+  ], 'client', {isAsset: true});
 
   api.export('Offline', ['client', 'server']);
 
@@ -46,6 +44,7 @@ Package.on_use(function (api) {
   api.add_files('worker-client.litcoffee', 'client');
 
   api.add_files('proxy.litcoffee', 'client');
+  api.add_files('fallback.litcoffee', 'client');
 
   api.add_files('server.litcoffee', 'server');
 });

@@ -104,7 +104,7 @@
     // the syntax error).
 
     importScripts(
-      __meteor_runtime_config__.offlineDataWorker.urls['worker-packages.javascript']
+      __meteor_runtime_config__.offlineDataWorker.urls['worker-packages.js']
     );
     booted = true;
 

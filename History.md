@@ -1,3 +1,12 @@
+## v0.1.2
+
+Update for Meteor 0.6.5.1.
+
+Use asset for worker Javascript files.
+
+Fallback for when the browser database is unavailable. (#6)
+
+
 ## v0.1.1
 
 Update for Meteor 0.6.5.

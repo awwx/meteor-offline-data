@@ -1,6 +1,6 @@
     files = [
-      'worker-boot.javascript'
-      'worker-packages.javascript'
+      'worker-boot.js'
+      'worker-packages.js'
     ]
 
 

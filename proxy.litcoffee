@@ -1,4 +1,4 @@
-    return unless Offline.supported
+    return unless Offline.persistent
 
     database = Offline._database
     {thisWindowId} = Offline._windows
@@ -306,10 +306,6 @@ https://github.com/meteor/meteor/blob/release/0.6.5/packages/livedata/livedata_c
       new OfflineConnection('/')
 
 
-    Offline.subscribe = (name, args...) ->
-      defaultOfflineConnection.subscribe(name, args...)
-
-
     Offline.subscriptions = (subscriptions) ->
       defaultOfflineConnection.subscriptions(subscriptions)
 
@@ -320,6 +316,10 @@ https://github.com/meteor/meteor/blob/release/0.6.5/packages/livedata/livedata_c
 
     Offline.subscriptionLoaded = (name, args...) ->
       defaultOfflineConnection.subscriptionLoaded(name, args...)
+
+
+    Offline.methods = (methods) ->
+      defaultOfflineConnection.methods(methods)
 
 
 connectionName -> collectionName -> LocalCollection

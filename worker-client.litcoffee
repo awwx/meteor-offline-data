@@ -1,6 +1,7 @@
 TODO not supporting unit tests with shared web worker yet.
 
-    if (not @SharedWorker? or
+    if (not Offline?.persistent or
+        not @SharedWorker? or
         Meteor.settings?.public?.offlineData?.disableWorker or
         @Tinytest?)
       Offline._usingSharedWebWorker = false
@@ -13,7 +14,7 @@ TODO not supporting unit tests with shared web worker yet.
 Reference the boot script with the same "cache busting" URL that the
 appcache generates for the app manifest.
 
-    url = __meteor_runtime_config__.offlineDataWorker.urls['worker-boot.javascript']
+    url = __meteor_runtime_config__.offlineDataWorker.urls['worker-boot.js']
     hash = url.substr(url.lastIndexOf('?') + 1)
     worker = new SharedWorker(url, hash)
 

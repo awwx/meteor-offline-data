@@ -21,12 +21,12 @@ See the
 
 ## Version
 
-0.1.1
+0.1.2
 
-Use 0.1.1 with Meteor 0.6.5 only.
+Use 0.1.2 with Meteor 0.6.5.1 or 0.6.5 only.
 
 (Offline data is closely tied to Meteor's internal livedata
-implementation, and the shared web worker loads Meteor 0.6.5 code
+implementation, and the shared web worker loads Meteor 0.6.5.1 code
 modified to run in the web worker environment, so new releases of
 Meteor require a new release of offline data).
 
@@ -36,8 +36,6 @@ For Meteor 0.6.4.1, use Offline Data version 0.1.0.
 Current gaps:
 
 * [no support yet for IE and Firefox](https://github.com/awwx/meteor-offline-data/issues/5)
-
-* [no fallback if the browser database isn't available](https://github.com/awwx/meteor-offline-data/issues/6)
 
 * [no support for accounts](https://github.com/awwx/meteor-offline-data/issues/2)
 
@@ -125,15 +123,14 @@ documents and then reloading them.  Instead we want to subscribe to "lists" and 
 
 ## Offline API
 
-**Offline.supported**
+**Offline.persistent**
 *client*
 
-This constant is `true` if offline data is supported in this browser
-(for example, the browser supports the Web SQL Database) and `false`
-if it isn't.
+This constant is `true` if data can be stored offline in this browser
+(for example, the browser supports the Web SQL Database).
 
-Other methods in the API aren't defined if offline data isn't
-supported.
+When `false`, the Offline Data API falls back to using Meteor
+collections, and stores data in memory only.
 
 
 **Offline.subscriptions([
