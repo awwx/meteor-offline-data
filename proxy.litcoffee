@@ -1,4 +1,4 @@
-    return unless Offline.persistent
+    return if Offline.isWebWorker or not Offline.persistent
 
     database = Offline._database
     {thisWindowId} = Offline._windows

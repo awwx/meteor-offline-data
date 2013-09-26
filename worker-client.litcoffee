@@ -1,3 +1,6 @@
+    return if Offline.isWebWorker
+
+
 TODO not supporting unit tests with shared web worker yet.
 
     if (not Offline?.persistent or

@@ -1,0 +1,76 @@
+diff -u -r --exclude .build --exclude .npm /home/andrew/meteor/packages/livedata/sockjs-0.3.4.js ./sockjs-0.3.4.js
+--- /home/andrew/meteor/packages/livedata/sockjs-0.3.4.js	2013-08-21 18:31:26.092471253 -0400
++++ ./sockjs-0.3.4.js	2013-08-25 11:28:47.345100351 -0400
+@@ -30,9 +30,26 @@
+ 
+ //     [*] Including lib/index.js
+ // Public object
++
++var notImpl = function (name) {
++  return function () {
++    Meteor._debug(new Error('not implemented: ' + name).stack);
++  };
++};
++
+ SockJS = (function(){
+-              var _document = document;
+-              var _window = window;
++              var _document = (typeof document !== 'undefined') ? document : {
++  location: location,
++  attachEvent: notImpl('attachEvent'),
++  detachEvent: notImpl('detachEvent'),
++  createElement: notImpl('createElement'),
++  domain: location.hostname
++};
++              var _window = (typeof window !== 'undefined') ? window : {
++  location: location,
++  WebSocket: WebSocket,
++  XMLHttpRequest: XMLHttpRequest
++};
+               var utils = {};
+ 
+ 
+@@ -293,9 +310,7 @@
+ }
+ 
+ utils.log = function() {
+-    if (_window.console && console.log && console.log.apply) {
+-        console.log.apply(console, arguments);
+-    }
++    Meteor._debug.apply(null, arguments);
+ };
+ 
+ utils.bind = function(fun, that) {
+@@ -615,10 +630,6 @@
+     trigger_unload_callbacks();
+ };
+ 
+-// 'unload' alone is not reliable in opera within an iframe, but we
+-// can't use `beforeunload` as IE fires it on javascript: links.
+-utils.attachEvent('unload', unload_triggered);
+-
+ utils.unload_add = function(listener) {
+     var ref = utils.random_string(8);
+     on_unload[ref] = listener;
+@@ -963,7 +974,7 @@
+         // makes `new` optional
+         return new SockJS(url, dep_protocols_whitelist, options);
+     }
+-    
++
+     var that = this, protocols_whitelist;
+     that._options = {devel: false, debug: false, protocols_whitelist: [],
+                      info: undefined, rtt: undefined};
+@@ -2423,7 +2434,6 @@
+ 
+                   return SockJS;
+           })();
+-if ('_sockjs_onload' in window) setTimeout(_sockjs_onload, 1);
+ 
+ // AMD compliance
+ if (typeof define === 'function' && define.amd) {
+@@ -2432,4 +2442,3 @@
+ //     [*] End of lib/index.js
+ 
+ // [*] End of lib/all.js
+-

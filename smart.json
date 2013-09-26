@@ -12,9 +12,10 @@
   "git": "https://github.com/awwx/meteor-offline-data.git",
 
   "packages": {
-    "offline-common": {
-      "git": "https://github.com/awwx/meteor-offline-common.git",
-      "tag": "v0.1.2"
+    "browser-msg": "1.1.0",
+    "canonical-stringify": {
+      "git": "https://github.com/awwx/meteor-canonical-stringify.git",
+      "tag": "v1.3"
     },
     "isolate-value": "2.0.2",
     "variable": "1.0.0"
