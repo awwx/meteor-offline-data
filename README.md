@@ -1,4 +1,4 @@
-# Meteor Offline Data #
+# Meteor Offline Data
 
 Home of the Meteor offline data project, implementing an "Offline
 Collection" which wraps a `Meteor.Collection`:
@@ -17,6 +17,59 @@ application, even while offline.
 
 See the
 [two minute video introducing Offline Data](http://vimeo.com/64803472)
+
+
+## A Big Problem
+
+The architecture used by Offline Data avoids three-way merges.
+
+In Offline Data, windows need to share updates between themselves to
+give a good user experience when offline.  (Otherwise if the user
+comes back to a different window without realizing it, they'll be
+alarmed when something they entered has appeared to have vanished).
+
+In standard Meteor, each browser window has its own connection to the
+server.  If we did this *and* had windows sharing updates as well,
+we'd have to deal with three-way merges.  We'd have updates coming
+from other windows, and updates coming from the server, and we'd need
+to merge them correctly.
+
+The approach taken by Offline Data is to have *one* connection to the
+server, shared by the windows open on an application.  Now updates
+flow in a linear fashion.  Windows talk to the agent, which talks to
+the server.  This is easy to figure out how to do right, and is easy
+to debug when something strange happens.  We don't have obscure race
+conditions to avoid, and we don't need to be proving proofs to ensure
+that we're not going to occasionally mess up a three-way merge.
+
+The easy way to do this is with a shared web worker.  We put the agent
+in the shared web worker, which is shared between windows, the shared
+web worker talks to the server, and everything works.
+
+For browsers which don't support shared web workers, the browser
+windows elect one of their number to act as the agent and make the
+connection to the server.  It's more complicated than just using a
+shared web worker because the window acting as the agent might be
+closed and another window has to take over.  But the end result is the
+same.
+
+This approach of having one browser window make the connection to the
+server on behalf of the other windows doesn't work on iOS because iOS
+suppresses timer events in inactive tabs.  But that's OK, because iOS
+supports shared web workers.
+
+Until now.  iOS 7 [has dropped support for shared web
+workers](http://caniuse.com/sharedworkers).
+
+This is a big problem for the current architecture of Offline Data.
+
+So what's next?  Maybe we change the architecture.  Currently, Offline
+Data runs on standard DDP.  The server doesn't know or care that the
+client is storing data offline.  On the server, it's plain unmodifed
+Meteor collections.  But we could add server support for offline data, use timestamps or whatever, extend DDP if we need to.
+
+Or maybe there will be some clever way to get the "one connection to
+the server" agent working in iOS 7.  I don't know yet.
 
 
 ## Version
@@ -74,7 +127,7 @@ and method calls can complete in a different instance of the
 application.
 
 
-## Limitations ##
+## Limitations
 
 * Unnamed subscriptions (such as published by the `autopublish`
 package) are not supported.  You will need to use
@@ -344,7 +397,7 @@ client each time the application is opened.  For larger data sets
 it would be nice to only need to download new and changed documents.
 
 
-## Architecture ##
+## Architecture
 
 Offline subscriptions are made from the "offline agent" in the client,
 which connects to the server on behalf of the browser windows.  This
