@@ -1,4 +1,15 @@
-# Meteor Offline Data
+# On Hold
+
+This project is currently on hold, awaiting time for me (or someone)
+to redesign to address the problems with the current approach.
+
+I'd like the thank the many supporters of the project.  While I
+regret the first attempt didn't result in a workable implementation,
+I hope that post the 1.0 Meteor release we'll be able to revisit
+and come up with a new design.
+
+
+## Meteor Offline Data
 
 Home of the Meteor offline data project, implementing an "Offline
 Collection" which wraps a `Meteor.Collection`:
